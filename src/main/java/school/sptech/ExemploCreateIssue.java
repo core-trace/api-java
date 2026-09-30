@@ -10,7 +10,7 @@ public class ExemploCreateIssue {
         // ATENÇÃO: USE VARIÁVEIS DE AMBIENTE!
         String baseUrl = "https://petrocontrol.atlassian.net"; // ex: https://seu-dominio.atlassian.net
         String email = "Coretrace.tech@gmail.com";
-        String apiToken = ""; // Colocar o token aqui;
+        String apiToken = "ATATT3xFfGF0uzRbzF-uV29Ct-iyYIFHpsJSSLsiCEYDqgsUkZXvUh7TB4Jz-xPrqa-yk0ZMKBACoc4diMA28pQmx3alRBybWzxdmUkAhp0FYVD9ipWQ8XtLi4a0OvueDKTj8C2KNFWyk4Q2z60aTeCpUGEY2twDLaCi9ik25n4pwRyiR47por4=C706F07D"; // Colocar o token aqui;
 
         Jira jira = new Jira(baseUrl, email, apiToken);
 
