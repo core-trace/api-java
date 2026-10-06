@@ -1,5 +1,4 @@
-
-package sptech.school;
+package school.sptech;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
@@ -19,19 +18,6 @@ public class Main {
         // Instanciando o cliente S3 via S3Provider
         S3Client s3Client = new S3Provider().getS3Client();
         String bucketName = "nome-do-bucket";
-
-        // *************************************
-        // *   Criando um novo bucket no S3    *
-        // *************************************
-        try {
-            CreateBucketRequest createBucketRequest = CreateBucketRequest.builder()
-                    .bucket(bucketName)
-                    .build();
-            s3Client.createBucket(createBucketRequest);
-            System.out.println("Bucket criado com sucesso: " + bucketName);
-        } catch (S3Exception e) {
-            System.err.println("Erro ao criar o bucket: " + e.getMessage());
-        }
 
         // *************************************
         // *   Listando todos os buckets       *
