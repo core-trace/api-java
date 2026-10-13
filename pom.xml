@@ -29,6 +29,13 @@
             <version>2.27.21</version>
         </dependency>
 
+        <!-- Carrega configurações do arquivo .env -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.2.0</version>
+        </dependency>
+
         <!-- Driver JDBC do MySQL -->
         <dependency>
             <groupId>com.mysql</groupId>

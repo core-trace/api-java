@@ -1,5 +1,6 @@
 package school.sptech;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import school.sptech.client.MySqlProvider;
 import school.sptech.client.S3Provider;
 import school.sptech.config.Jira;
@@ -29,32 +30,53 @@ public class Main {
     private static final List<String> METRICAS = List.of(
             "cpu_percent", "ram_percent", "disk_percent", "swap_percent");
 
-    private static final String JIRA_PROJECT = "SUP";
-
     public static void main(String[] args) {
-        S3Client s3Client = new S3Provider().getS3Client();
-
-        String bucketName = "testejavacoretrace";
-        String key = "03-gold/server_metrics_gold.csv";
-
         try {
+            Dotenv env = Dotenv.load();
+            validarConfiguracao();
+
+            S3Client s3Client = new S3Provider().getS3Client();
+            String bucketName = env.get("S3_BUCKET");
+            String key = env.get("S3_KEY");
+
             List<Map<String, String>> registros = lerCsv(s3Client, bucketName, key);
             System.out.println("Linhas lidas: " + registros.size());
 
             validarLimites(registros, new LimiteDao(new MySqlProvider()), criarJira());
 
         } catch (S3Exception e) {
-            System.err.println("Erro ao acessar o S3: " + e.awsErrorDetails().errorMessage());
+            String mensagem = e.awsErrorDetails() == null
+                    ? e.getMessage()
+                    : e.awsErrorDetails().errorMessage();
+            System.err.println("Erro ao acessar o S3: " + mensagem);
         } catch (IOException e) {
             System.err.println("Erro ao ler o CSV: " + e.getMessage());
+        } catch (IllegalStateException e) {
+            System.err.println("Erro de configuração: " + e.getMessage());
         }
     }
 
-    private static Jira criarJira() {
-        String url   = "https://petrocontrol.atlassian.net";
-        String email = "Coretrace.tech@gmail.com";
-        String token = "ATATT3xFfGF0uzRbzF-uV29Ct-iyYIFHpsJSSLsiCEYDqgsUkZXvUh7TB4Jz-xPrqa-yk0ZMKBACoc4diMA28pQmx3alRBybWzxdmUkAhp0FYVD9ipWQ8XtLi4a0OvueDKTj8C2KNFWyk4Q2z60aTeCpUGEY2twDLaCi9ik25n4pwRyiR47por4=C706F07D"; // o mesmo que estava no ExemploCreateIssue
+    private static void validarConfiguracao() {
 
+        Dotenv env = Dotenv.load();
+
+        env.get("DB_HOST");
+        env.get("DB_NAME");
+        env.get("DB_USER");
+        env.get("DB_PASSWORD");
+        env.get("S3_BUCKET");
+        env.get("S3_KEY");
+        env.get("JIRA_BASE_URL");
+        env.get("JIRA_EMAIL");
+        env.get("JIRA_API_TOKEN");
+        env.get("JIRA_PROJECT_KEY");
+    }
+
+    private static Jira criarJira() {
+        Dotenv env = Dotenv.load();
+        String url = env.get("JIRA_BASE_URL").replaceAll("/+$", "");
+        String email = env.get("JIRA_EMAIL");
+        String token = env.get("JIRA_API_TOKEN");
         return new Jira(url, email, token);
     }
 
@@ -115,7 +137,8 @@ public class Main {
 
     private static void criarTicket(Jira jira, String resumo) {
         try {
-            String resposta = jira.createIssue(JIRA_PROJECT, resumo, "Task");
+            Dotenv env = Dotenv.load();
+            String resposta = jira.createIssue(env.get("JIRA_PROJECT_KEY"), resumo, env.get("JIRA_ISSUE_TYPE", "Task"));
             System.out.println("  -> Ticket criado: " + resposta);
         } catch (IOException e) {
             System.err.println("  -> Erro de rede ao criar ticket: " + e.getMessage());
