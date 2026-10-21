@@ -1,6 +1,6 @@
 package school.sptech.client;
 
-import io.github.cdimascio.dotenv.Dotenv;
+import school.sptech.config.Env;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -13,15 +13,14 @@ public class MySqlProvider {
     private final String senha;
 
     public MySqlProvider() {
-        Dotenv env = Dotenv.load();
-        String host = env.get("DB_HOST");
-        String porta = env.get("DB_PORT", "3306");
-        String banco = env.get("DB_NAME");
+        String host = Env.require("DB_HOST");
+        String porta = Env.get("DB_PORT", "3306");
+        String banco = Env.require("DB_NAME");
 
         this.url = "jdbc:mysql://" + host + ":" + porta + "/" + banco
                 + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
-        this.usuario = env.get("DB_USER");
-        this.senha = env.get("DB_PASSWORD");
+        this.usuario = Env.require("DB_USER");
+        this.senha = Env.require("DB_PASSWORD");
     }
 
     public Connection getConnection() throws SQLException {

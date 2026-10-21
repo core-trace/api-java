@@ -1,6 +1,6 @@
 package school.sptech.client;
 
-import io.github.cdimascio.dotenv.Dotenv;
+import school.sptech.config.Env;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -16,8 +16,7 @@ public class S3Provider {
     }
 
     public S3Client getS3Client() {
-        Dotenv env = Dotenv.load();
-        String regiao = env.get("AWS_REGION", "us-east-1");
+        String regiao = Env.get("AWS_REGION", "us-east-1");
         return S3Client.builder()
                 .region(Region.of(regiao))
                 .credentialsProvider(credentials)

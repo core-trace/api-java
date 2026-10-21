@@ -1,8 +1,27 @@
-# Configuração do CoreTrace com `.env`
+# CoreTrace — processamento dinâmico de vários CSVs
 
-## 1. Preparar as configurações
+## Banco de dados: nenhuma alteração necessária
 
-Na raiz do projeto, copie o modelo e edite os valores:
+Esta versão do Java foi preparada para consultar a estrutura existente do MySQL. Ela **não executa `INSERT`, `UPDATE`, `DELETE`, `ALTER TABLE`, `DROP` ou scripts de migração**. O `LimiteDao` realiza somente uma consulta `SELECT` nas tabelas `servidores`, `componentes_perfil` e `componentes`.
+
+O arquivo `database/script_banco_original.sql` é apenas uma cópia do script SQL originalmente enviado para referência; ele foi mantido sem alterações. Não é necessário executá-lo novamente nem executar qualquer outro SQL para usar o processamento dinâmico.
+
+> Observação: o Java respeita as associações de componentes e limites que já estão gravadas no seu banco. Se os valores atuais de `fk_componente` apontarem para um componente diferente do pretendido, o programa não altera esses dados nem tenta adivinhar a intenção dos comentários do SQL; ele usará a configuração que realmente encontrar no banco.
+
+## O que o Java faz
+
+- Remove a lista fixa `METRICAS` com os nomes das colunas.
+- Por padrão, lista os arquivos `.csv` do S3 dentro de `S3_PREFIX` e processa cada arquivo separadamente.
+- Cada CSV pode ter um conjunto diferente de colunas.
+- Cada linha precisa conter `endereco_mac`; esse MAC identifica o servidor e o perfil associado no MySQL.
+- Os cabeçalhos são comparados dinamicamente com `componentes.nome_coluna`.
+- Só são avaliadas métricas que existem no catálogo, estão associadas ao perfil do servidor e possuem pelo menos um limite configurado.
+- Usa o operador já cadastrado em `componentes_perfil.operador` (`>`, `>=`, `<`, `<=`, `=`, `==`, `!=` ou `<>`).
+- Continua criando tickets no Jira para ocorrências críticas, conforme a configuração da aplicação.
+
+## Configurar `.env`
+
+Na raiz do projeto:
 
 ```bash
 cp .env.example .env
@@ -10,40 +29,49 @@ nano .env
 chmod 600 .env
 ```
 
-Preencha `DB_PASSWORD` com a senha do usuário MySQL que a aplicação deve usar e `JIRA_API_TOKEN` com um token novo. Não compartilhe o `.env` nem o envie ao Git.
+Preencha as credenciais reais. Não compartilhe o `.env`, não o inclua no Git e não coloque segredos no JAR.
 
-O `DB_HOST=127.0.0.1` só serve se o MySQL estiver na mesma máquina e aceitar conexões por loopback. Se estiver em outra máquina/VM, use o endereço privado correto e garanta conectividade/firewall.
+Para processar todos os CSVs do prefixo:
 
-## 2. Permissões MySQL
-
-A aplicação só consulta `servidores`, `componentes_perfil` e `componentes`; use um usuário específico e privilégio somente de leitura. Execute como administrador do MySQL e substitua a senha:
-
-```sql
-CREATE USER IF NOT EXISTS 'coretrace_app'@'172.17.0.1'
-  IDENTIFIED BY 'ESCOLHA_UMA_SENHA_FORTE';
-GRANT SELECT ON coretrace.* TO 'coretrace_app'@'172.17.0.1';
-FLUSH PRIVILEGES;
+```dotenv
+S3_BUCKET=testejavacoretrace
+S3_PREFIX=03-gold/
 ```
 
-O host `'172.17.0.1'` acima é baseado no erro apresentado no terminal. Use o endereço de origem que o servidor realmente vê. Não use `'%'` indiscriminadamente; prefira limitar por IP e firewall. Caso o usuário já exista com outra senha, atualize-o com `ALTER USER` antes de testar.
+Remova ou comente qualquer linha `S3_KEY=...` já existente. Se `S3_KEY` estiver preenchido, o programa processa somente aquele arquivo. Se estiver ausente/vazio, ele lista todos os objetos `.csv` sob `S3_PREFIX`.
 
-## 3. Compilar e executar
+Cada CSV precisa conter `endereco_mac`. Os nomes das métricas devem corresponder aos valores existentes em `componentes.nome_coluna`, por exemplo `cpu_percent`, `ram_percent`, `disk_percent` ou `net_errors`. `timestamp` e `endereco_mac` são tratados como metadados, não como métricas.
 
-Execute os comandos na raiz do projeto, onde está o `.env`:
+## Permissões AWS para vários CSVs
+
+A autenticação usa o provedor padrão de credenciais do SDK. Em uma EC2, prefira uma IAM Role com permissões mínimas:
+
+- `s3:ListBucket` no bucket, restringindo o prefixo em `s3:prefix`;
+- `s3:GetObject` nos objetos dentro do prefixo configurado.
+
+Quando a IAM Role estiver configurada, não é necessário colocar `AWS_ACCESS_KEY_ID` ou `AWS_SECRET_ACCESS_KEY` no `.env` da EC2.
+
+## MySQL
+
+A aplicação precisa conseguir ler `servidores`, `componentes_perfil` e `componentes`. Recomenda-se usar um usuário com permissão de leitura somente nas tabelas necessárias. `DB_HOST=127.0.0.1` só é correto se o MySQL estiver acessível localmente a partir do processo Java.
+
+A consulta usa o `endereco_mac` para localizar o servidor e obter o perfil relacionado. Métricas com os dois limites (`limite_atencao` e `limite_critico`) nulos não geram alerta.
+
+## Compilar e executar
+
+Com JDK 21 e Maven instalados, na raiz do projeto:
 
 ```bash
 mvn clean package
 java -jar target/coretrace.jar
 ```
 
-O arquivo `.env` é lido pelo `dotenv-java` a partir do diretório de execução. Se rodar o JAR a partir de outra pasta, a aplicação pode não encontrar o arquivo.
+Para executar na EC2, transfira o JAR recém-gerado e mantenha o `.env` no diretório de onde o Java será iniciado.
 
-## 4. Credenciais AWS / S3
+## Observações
 
-O código mantém o `DefaultCredentialsProvider` do AWS SDK. Em uma EC2, a recomendação é associar uma IAM Role com permissão mínima para ler o objeto S3, em vez de guardar `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` no `.env`. O arquivo `.env` configura região, bucket e chave do objeto; ele não injeta automaticamente variáveis para o SDK AWS.
-
-Para execução local, configure um perfil AWS em `~/.aws/credentials` ou use uma sessão autenticada pelo AWS CLI.
-
-## 5. Aviso de segurança
-
-O código original continha um token do Jira e o histórico Git do projeto também o inclui. Revogue esse token e gere outro. Apenas removê-lo do arquivo atual não elimina o segredo dos commits antigos nem de JARs já compilados. Depois de trocar o token, reconstrua o JAR e, se o repositório for compartilhado, avalie a limpeza do histórico e a remoção dos artefatos antigos.
+- Cada CSV é processado sequencialmente, sem carregar todos os arquivos na memória de uma vez.
+- O leitor trata aspas e vírgulas dentro de campos, mas considera que cada registro ocupa uma única linha física.
+- Os valores devem ser numéricos para a comparação de limites; métricas categóricas, como `net_isup`, são ignoradas por essa validação numérica.
+- A deduplicação de alertas vale apenas durante uma execução do programa, não entre execuções.
+- O código não altera seu banco nem corrige automaticamente associações que já estejam incorretas.
