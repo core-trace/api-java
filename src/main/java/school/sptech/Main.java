@@ -114,7 +114,7 @@ public class Main {
 
         String prefixo = Env.get("S3_PREFIX", "03-gold/").trim();
         if (prefixo.isEmpty()) {
-            prefixo = "03-gold/";
+            prefixo = "client/";
         } else if (!prefixo.endsWith("/")) {
             prefixo += "/";
         }
