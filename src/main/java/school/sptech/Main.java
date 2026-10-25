@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * CoreTrace: lê um ou mais CSVs do S3, procura os limites das métricas
@@ -38,6 +41,22 @@ public class Main {
     private static final String COLUNA_TIMESTAMP = "timestamp";
 
     public static void main(String[] args) {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+        scheduler.scheduleWithFixedDelay(() -> {
+            try {
+                System.out.println("Verificando novos CSVs no S3...");
+
+                executarProcessamento();
+
+                System.out.println("\nProcessamento concluído em " + java.time.LocalDateTime.now() + ". Próxima verificação em 5 minutos.");
+            } catch (Exception e) {
+                System.out.println("Erro: " + e.getMessage());
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
+    private static void executarProcessamento() {
         try {
             validarConfiguracao();
 
