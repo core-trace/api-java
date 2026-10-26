@@ -292,13 +292,12 @@ public class Main {
                         System.out.printf("[%s] %s | %s = %.2f %s (operador %s, limite %.2f) em %s%n",
                                 nivel, mac, limite.nome(), valor, limite.unidade(),
                                 limite.operador(), limiteAtingido, timestamp);
-
-                        if (nivel.equals("CRITICO")) {
-                            String resumo = String.format(
-                                    "[CRITICO] %s - %s = %.2f %s (limite %.2f) em %s",
-                                    mac, limite.nome(), valor, limite.unidade(), limiteAtingido, timestamp);
-                            criarTicket(jira, resumo);
-                        }
+										if(nivel.equals("CRITICO") || nivel.equals("ATENCAO")) {
+													String resumo = String.format(
+								"[%s] %s - %s = %.2f %s (limite %.2f) em %s",
+								nivel,mac,limite.nome(),valor,limite.unidade(),limiteAtingido,timestamp);
+							criarTicket(jira,resumo);
+						}
                     }
                 }
             }
