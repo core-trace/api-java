@@ -334,7 +334,7 @@ public class Main {
             Set<String> metricasConsultadas
     ) throws IOException {
 
-        return percorrerArray(parser, tipo, mac, dao,
+        return percorrerArray(parser, tipo, null, mac, dao,
                 cacheLimites, metricasConsultadas
         );
     }
@@ -351,6 +351,7 @@ public class Main {
     private static int percorrerArray(
             JsonParser parser,
             String caminho,
+            String recurso,
             String mac,
             LimiteDao dao,
             Map<String, LimiteDao.Limite> cacheLimites,
@@ -379,9 +380,12 @@ public class Main {
 
                 // Encontramos um objeto dentro do array.
                 // Encaminhamos sua leitura ao percorrerObjeto().
+                // Cada elemento herda o identificador
+                // do recurso ao qual o array pertence
                 total += percorrerObjeto(
                         parser,
                         caminhoItem,
+                        recurso,
                         mac,
                         dao,
                         cacheLimites,
@@ -392,9 +396,11 @@ public class Main {
 
                 // Encontramos outro array dentro do array atual.
                 // O método chama a si mesmo: recursividade.
+                // Repassa o identificador ao array interno
                 total += percorrerArray(
                         parser,
                         caminhoItem,
+                        recurso,
                         mac,
                         dao,
                         cacheLimites,
@@ -421,6 +427,7 @@ public class Main {
     private static int percorrerObjeto(
             JsonParser parser,
             String caminho,
+            String recurso,
             String mac,
             LimiteDao dao,
             Map<String, LimiteDao.Limite> cacheLimites,
@@ -434,15 +441,22 @@ public class Main {
         String status = null;
         Double valor = null;
 
-        int total = 0;
+        // Informações utilizadas para identificar
+        // CPUs lógicas, discos, redes e processos.
+        String indice = null;
+        String nome = null;
+        String dispositivo = null;
+        String montagem = null;
+        String pid = null;
 
+        int total = 0;
         JsonToken token;
 
         // Percorre os campos até encontrar o fechamento: }
         while ((token = parser.nextToken()) != JsonToken.END_OBJECT) {
 
             if (token == null)
-                throw new IOException("Objeto JSON incompleto");
+                throw new IOException("Objeto JSON inválido");
 
             // Nome do campo que estamos analisando.
             String campo = parser.currentName();
@@ -453,6 +467,13 @@ public class Main {
             if (token == null)
                 throw new IOException("Objeto JSON incompleto");
 
+            // Antes de entrar em um objeto interno,
+            // verifica se já identificamos o recurso pai.
+            String recursoAtual = identificarRecurso(
+                    caminho, recurso, indice, nome,
+                    dispositivo, montagem, pid
+            );
+
             if (token == JsonToken.START_OBJECT) {
 
                 // Encontrou um objeto dentro do objeto atual.
@@ -460,6 +481,7 @@ public class Main {
                 total += percorrerObjeto(
                         parser,
                         caminho + "." + campo,
+                        recursoAtual,
                         mac,
                         dao,
                         cacheLimites,
@@ -478,6 +500,7 @@ public class Main {
                 total += percorrerArray(
                         parser,
                         caminho + "." + campo,
+                        recursoAtual,
                         mac,
                         dao,
                         cacheLimites,
@@ -507,6 +530,22 @@ public class Main {
                     if (token.isNumeric())
                         valor = parser.getDoubleValue();
                 }
+
+                // Identificadores de recursos.
+                case "indice" ->
+                        indice = parser.getValueAsString();
+
+                case "nome" ->
+                        nome = parser.getValueAsString();
+
+                case "dispositivo" ->
+                        dispositivo = parser.getValueAsString();
+
+                case "montagem" ->
+                        montagem = parser.getValueAsString();
+
+                case "pid" ->
+                        pid = parser.getValueAsString();
             }
         }
 
@@ -518,6 +557,15 @@ public class Main {
                 && valor != null
                 && Double.isFinite(valor)) {
 
+            // Depois de ler o objeto completo, verifica
+            // se ele possui um identificador mais específico.
+            // Isso é importante para CPUs lógicas, porque
+            // o campo "indice" pode aparecer após "valor".
+            String recursoIdentificado = identificarRecurso(
+                    caminho, recurso, indice, nome,
+                    dispositivo, montagem, pid
+            );
+
             // A leitura passou nas validações.
             // Agora podemos consultar e comparar seus limites.
             avaliarMetrica(
@@ -525,7 +573,7 @@ public class Main {
                     metrica,
                     campoOrigem,
                     valor,
-                    caminho,
+                    recursoIdentificado,
                     dao,
                     cacheLimites,
                     metricasConsultadas
@@ -663,7 +711,69 @@ public class Main {
         );
     }
 
+    /**
+     * Identifica o recurso físico ou lógico associado
+     * a determinado objeto do JSON.
+     *
+     * O identificador herdado vem do objeto pai.
+     * Exemplo: a métrica de ocupação herda "/dev/sda1"
+     * do objeto que representa o volume.
+     */
+    private static String identificarRecurso(
+            String caminho,
+            String herdado,
+            String indice,
+            String nome,
+            String dispositivo,
+            String montagem,
+            String pid
+    ) {
 
+        // CPU lógica: identificada pelo índice.
+        if (caminho.contains(".logicas.leituras[")
+                && indice != null) {
+            return "CPU lógica " + indice;
+        }
+
+        // Volume de disco: identificamos o dispositivo
+        // e também o ponto de montagem, se disponível.
+        if (caminho.contains(".disco.volumes[")
+                && dispositivo != null) {
+            return "Volume " + dispositivo
+                    + (montagem != null ? " (" + montagem + ")" : "");
+        }
+
+        // Disco utilizado nas capturas de I/O.
+        if (caminho.contains(".disco.io[")
+                && dispositivo != null) {
+            return "Disco " + dispositivo;
+        }
+
+        // Interface de rede.
+        if (caminho.contains(".rede.interfaces[")
+                && nome != null) {
+            return "Interface " + nome;
+        }
+
+        // Processo individual.
+        if (caminho.startsWith("processos[")
+                && !caminho.contains(".")
+                && nome != null) {
+            return "Processo " + nome
+                    + (pid != null ? " (PID " + pid + ")" : "");
+        }
+
+        // Contêiner individual.
+        if (caminho.startsWith("containers[")
+                && !caminho.contains(".")
+                && nome != null) {
+            return "Contêiner " + nome;
+        }
+
+        // Se o objeto não possui identificador próprio,
+        // mantém o identificador recebido do pai.
+        return herdado != null ? herdado : caminho;
+    }
 
     /** Avalia a métrica usando o operador configurado em componentes_perfil.operador. */
     private static boolean atingiuLimite(double valor, Double limite, String operador) {
