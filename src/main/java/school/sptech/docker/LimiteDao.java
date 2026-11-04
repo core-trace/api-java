@@ -18,8 +18,30 @@ import java.util.stream.Collectors;
 /** Acesso aos limites cadastrados para as métricas habilitadas no perfil do servidor. */
 public class LimiteDao {
 
-    public record Limite(String nomeColuna, String nome, String unidade,
-                         Double atencao, Double critico, String operador) {}
+    /**
+     * Representa os limites de uma métrica configurada no banco.
+     *
+     * Cada métrica pode ter até duas condições independentes.
+     *
+     * Exemplo:
+     * Condição 1: valor > 90 (crítico)
+     * Condição 2: valor < 10 (crítico)
+     */
+    public record Limite(
+            String nomeColuna,
+            String nome,
+            String unidade,
+
+            // Primeira condição
+            Double atencao,
+            Double critico,
+            String operador,
+
+            // Segunda condição (opcional)
+            String operador2,
+            Double atencao2,
+            Double critico2
+    ) {}
 
     private final MySqlProvider provider;
 
@@ -84,25 +106,38 @@ public class LimiteDao {
                 .collect(Collectors.joining(", "));
 
         String sql = """
-        SELECT DISTINCT
-               comp.nome,
-               comp.nome_coluna,
-               comp.unidade,
-               cp.limite_atencao,
-               cp.limite_critico,
-               cp.operador
-        FROM servidores s
-        JOIN componentes_perfil cp
-          ON cp.fk_perfil_servidor = s.fk_perfil_servidor
-        JOIN componentes comp
-          ON comp.id_componente = cp.fk_componente
-        WHERE s.endereco_mac = ?
-          AND LOWER(comp.nome_coluna) IN (%s)
-          AND (
-              cp.limite_atencao IS NOT NULL
-              OR cp.limite_critico IS NOT NULL
-          )
-        """.formatted(placeholders);
+            SELECT DISTINCT
+                   comp.nome,
+                   comp.nome_coluna,
+                   comp.unidade,
+        
+                   -- Primeira condição
+                   cp.limite_atencao,
+                   cp.limite_critico,
+                   cp.operador,
+        
+                   -- Segunda condição
+                   cp.operador_2,
+                   cp.limite_atencao_2,
+                   cp.limite_critico_2
+        
+            FROM servidores s
+            JOIN componentes_perfil cp
+              ON cp.fk_perfil_servidor = s.fk_perfil_servidor
+            JOIN componentes comp
+              ON comp.id_componente = cp.fk_componente
+        
+            WHERE s.endereco_mac = ?
+              AND LOWER(comp.nome_coluna) IN (%s)
+        
+              -- Basta existir um limite em qualquer condição.
+              AND (
+                  cp.limite_atencao IS NOT NULL
+                  OR cp.limite_critico IS NOT NULL
+                  OR cp.limite_atencao_2 IS NOT NULL
+                  OR cp.limite_critico_2 IS NOT NULL
+              )
+            """.formatted(placeholders);
 
         // Abre a conexão e prepara o SQL.
         // O try-with-resources fecha os recursos automaticamente.
@@ -140,12 +175,15 @@ public class LimiteDao {
                                     rs.getString("nome"),
                                     rs.getString("unidade"),
 
-                                    // Converte BigDecimal para Double,
-                                    // preservando null quando não houver limite.
+                                    // Primeira condição
                                     paraDouble(rs.getBigDecimal("limite_atencao")),
                                     paraDouble(rs.getBigDecimal("limite_critico")),
+                                    rs.getString("operador"),
 
-                                    rs.getString("operador")
+                                    // Segunda condição
+                                    rs.getString("operador_2"),
+                                    paraDouble(rs.getBigDecimal("limite_atencao_2")),
+                                    paraDouble(rs.getBigDecimal("limite_critico_2"))
                             )
                     );
                 }

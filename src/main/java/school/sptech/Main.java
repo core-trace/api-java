@@ -590,29 +590,65 @@ public class Main {
         if (limite == null)
             return;
 
+        // Guarda a gravidade e a condição que gerou o alerta.
         String nivel;
         Double limiteAtingido;
+        String operadorAplicado;
 
-        // Verifica primeiro o limite crítico.
-        // Ele possui prioridade sobre o de atenção.
-        if (atingiuLimite(valor, limite.critico(), limite.operador())) {
+        // Verifica as condições críticas dos dois operadores.
+        // O segundo só é avaliado se houver operador configurado.
+        boolean critico1 = atingiuLimite(
+                valor, limite.critico(), limite.operador()
+        );
+
+        boolean critico2 = limite.operador2() != null
+                && !limite.operador2().isBlank()
+                && atingiuLimite(
+                valor, limite.critico2(), limite.operador2()
+        );
+
+        // Faz o mesmo para as condições de atenção.
+        boolean atencao1 = atingiuLimite(
+                valor, limite.atencao(), limite.operador()
+        );
+
+        boolean atencao2 = limite.operador2() != null
+                && !limite.operador2().isBlank()
+                && atingiuLimite(
+                valor, limite.atencao2(), limite.operador2()
+        );
+
+        // Prioridade 1: qualquer condição crítica.
+        // Isso impede que uma atenção prevaleça sobre um crítico.
+        if (critico1 || critico2) {
 
             nivel = "CRITICO";
-            limiteAtingido = limite.critico();
 
-        } else if (atingiuLimite(valor, limite.atencao(), limite.operador())) {
+            // Identifica qual condição crítica foi satisfeita.
+            if (critico1) {
+                limiteAtingido = limite.critico();
+                operadorAplicado = limite.operador();
+            } else {
+                limiteAtingido = limite.critico2();
+                operadorAplicado = limite.operador2();
+            }
+
+        // Prioridade 2: atenção, somente quando não houve crítico.
+        } else if (atencao1 || atencao2) {
 
             nivel = "ATENCAO";
-            limiteAtingido = limite.atencao();
 
-        } else {
+            if (atencao1) {
+                limiteAtingido = limite.atencao();
+                operadorAplicado = limite.operador();
+            } else {
+                limiteAtingido = limite.atencao2();
+                operadorAplicado = limite.operador2();
+            }
 
-            // O valor não atingiu nenhum limite.
-            return;
-        }
+        } else return;
 
-        // Por enquanto, apenas exibe a ocorrência.
-        // A integração com o Jira será adicionada depois.
+        // Mostra a condição exata que gerou o alerta.
         System.out.printf(
                 "[%s] MAC: %s | Recurso: %s | Métrica: %s | " +
                         "Origem: %s | Valor: %.2f | Operador: %s | Limite: %.2f%n",
@@ -622,10 +658,12 @@ public class Main {
                 metrica,
                 campoOrigem,
                 valor,
-                limite.operador(),
+                operadorAplicado,
                 limiteAtingido
         );
     }
+
+
 
     /** Avalia a métrica usando o operador configurado em componentes_perfil.operador. */
     private static boolean atingiuLimite(double valor, Double limite, String operador) {
