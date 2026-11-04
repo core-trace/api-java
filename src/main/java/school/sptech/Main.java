@@ -171,28 +171,71 @@ public class Main {
      * Processa um arquivo por vez. O cache de limites é local ao arquivo porque
      * arquivos diferentes podem ter conjuntos de colunas diferentes.
      */
+
+    /**
+     * Lê um arquivo JSON do S3 e encaminha seus registros
+     * para o processamento.
+     *
+     * O arquivo pode conter métricas da máquina, processos
+     * e contêineres.
+     *
+     * @return Quantidade de leituras válidas encontradas.
+     */
     private static int processarJson(
             S3Client s3,
             String bucket,
             String chave,
             LimiteDao dao,
             Jira jira,
-            Set<String> jaAlertados) throws IOException {
+            Set<String> jaAlertados
+    ) throws IOException {
 
         System.out.println("\nProcessando JSON: " + chave);
 
+        // Cria a requisição para localizar o arquivo no S3.
+        // A chave representa o caminho completo do objeto.
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(chave)
                 .build();
 
-        // Cria uma fábrica de Parsers (Analisadores)
+        // Fábrica responsável por criar o leitor de JSON.
         JsonFactory factory = new JsonFactory();
 
-        try (InputStream inputStream = s3.getObject(request);
-             //Criar um parser que é concetado ao conteúdo recebido do S3
-             JsonParser parser = factory.createParser(inputStream);
+        // Identificadores que serão extraídos do próprio arquivo.
+        String mac = null;
+        String loteId = null;
+
+        // Contador de leituras válidas.
+        int totalLeituras = 0;
+
+        // Guarda os limites já encontrados no MySQL.
+        // Chave: nome da métrica
+        // Valor: configuração de limites correspondente.
+        Map<String, LimiteDao.Limite> cacheLimites = new HashMap<>();
+
+        // Registra quais métricas já foram consultadas.
+        // Evita consultar novamente até mesmo métricas
+        // que não possuem limites cadastrados.
+        Set<String> metricasConsultadas = new HashSet<>();
+
+        try (
+                // Abre um fluxo de bytes diretamente do S3.
+                InputStream inputStream = s3.getObject(request);
+
+                // Interpreta o conteúdo do InputStream como JSON.
+                JsonParser parser = factory.createParser(inputStream)
         ) {
+
+            // O primeiro token deve representar a abertura
+            // do objeto principal do JSON: {
+            if (parser.nextToken() != JsonToken.START_OBJECT)
+                throw new IOException("JSON inválido");
+
+            JsonToken token;
+
+            // Percorre os campos do objeto principal até
+            // encontrar o fechamento: }
 
             // O JsonParser transforma estrutura do Json em um sequência de tokens
             // A leitura dele ocorre dessa maneira onde cada campo seria o TOKEN:
@@ -212,137 +255,389 @@ public class Main {
 //
 //                END_OBJECT
 //            }
-            while (parser.nextToken() != null) {
-                if (parser.currentToken() == JsonToken.FIELD_NAME) {
-                    String campo = parser.currentName();
+            while ((token = parser.nextToken()) != JsonToken.END_OBJECT) {
 
-                    parser.nextToken();
+                // Esperamos encontrar sempre o nome de um campo.
+                if (token != JsonToken.FIELD_NAME)
+                    throw new IOException("Campo JSON inválido");
 
-                    if (campo.equals("CPU_PERCENT")) {
-                        double valor = parser.getDoubleValue();
-                        System.out.println(valor);
+                // Obtém o nome do campo atual.
+                String campo = parser.currentName();
+
+                // Avança para o valor associado ao campo.
+                token = parser.nextToken();
+
+                if (token == null)
+                    throw new IOException("JSON incompleto");
+
+                switch (campo) {
+
+                    // Identifica a máquina que enviou as capturas.
+                    case "endereco_mac" ->
+                            mac = parser.getValueAsString();
+
+                    // Identifica o lote para posterior controle
+                    // de processamento e prevenção de duplicações.
+                    case "lote_id" ->
+                            loteId = parser.getValueAsString();
+
+                    // Os três tipos são arrays e seguem
+                    // o mesmo fluxo de leitura.
+                    case "metricas", "processos", "containers" -> {
+
+                        // Não podemos consultar os limites do banco
+                        // sem saber a qual máquina pertencem.
+                        if (mac == null || mac.isBlank())
+                            throw new IOException("MAC não identificado");
+
+                        // Confirma que o campo contém um array: [...]
+                        if (token != JsonToken.START_ARRAY)
+                            throw new IOException("Esperado array: " + campo);
+
+                        // Encaminha o parser, já posicionado no
+                        // início do array, para processar os registros.
+                        totalLeituras += processarRegistros(
+                                parser,
+                                campo,
+                                mac,
+                                dao,
+                                cacheLimites,
+                                metricasConsultadas
+                        );
                     }
+
+                    // Ignora campos que não fazem parte
+                    // do processamento atual, inclusive seus filhos.
+                    default -> parser.skipChildren();
                 }
             }
 
-//            String linhaCabecalho = null;
-//            if (linhaCabecalho == null) {
-//                System.err.println("Arquivo vazio; ignorando: " + chave);
-//                return 0;
-//            }
-//
-//            // Normalizamos os nomes das colunas para minúsculas; os valores não são alterados.
-//            List<String> colunas = parseCsvLine(linhaCabecalho.replace("\uFEFF", "")).stream()
-//                    .map(String::trim)
-//                    .map(nome -> nome.toLowerCase(Locale.ROOT))
-//                    .toList();
-//
-//            if (colunas.stream().noneMatch(COLUNA_MAC::equals)) {
-//                System.err.printf(
-//                        "CSV '%s' ignorado: o cabeçalho precisa conter a coluna '%s'.%n",
-//                        chave, COLUNA_MAC);
-//                return 0;
-//            }
-//
-//            // Passamos os nomes dinâmicos das colunas ao DAO. O banco retornará somente
-//            // as que existirem em componentes.nome_coluna, estiverem associadas ao perfil
-//            // do MAC e possuírem limite de atenção ou crítico configurado.
-//            List<String> colunasMetricas = colunas.stream()
-//                    .filter(nome -> !nome.isBlank())
-//                    .filter(nome -> !nome.equals(COLUNA_MAC))
-//                    .filter(nome -> !nome.equals(COLUNA_TIMESTAMP))
-//                    .distinct()
-//                    .toList();
-//
-//            System.out.println("Colunas no CSV: " + String.join(", ", colunas));
-//            System.out.println("Colunas candidatas a métricas: " + String.join(", ", colunasMetricas));
-//
-//            Map<String, Map<String, LimiteDao.Limite>> cachePorMac = new HashMap<>();
-            int linhasLidas = 0;
-            String linha;
-            int numeroLinha = 1;
+            System.out.printf(
+                    "MAC: %s | Lote: %s | Leituras válidas: %d%n",
+                    mac, loteId, totalLeituras
+            );
 
-//            while ((linha = reader.readLine()) != null) {
-//                numeroLinha++;
-//                if (linha.isBlank()) {
-//                    continue;
-//                }
-//
-//                List<String> valores = parseCsvLine(linha);
-//                Map<String, String> registro = new LinkedHashMap<>();
-//                for (int i = 0; i < colunas.size(); i++) {
-//                    registro.put(colunas.get(i), i < valores.size() ? valores.get(i).trim() : "");
-//                }
-//                linhasLidas++;
-//
-//                String mac = registro.get(COLUNA_MAC);
-//                if (mac == null || mac.isBlank()) {
-//                    System.err.printf("Linha %d do arquivo '%s' ignorada: endereco_mac vazio.%n",
-//                            numeroLinha, chave);
-//                    continue;
-//                }
-//
-//                if (!cachePorMac.containsKey(mac)) {
-//                    try {
-//                        Map<String, LimiteDao.Limite> limites = dao.buscarPorMac(mac, colunasMetricas);
-//                        cachePorMac.put(mac, limites);
-//                        if (limites.isEmpty()) {
-//                            System.out.printf(
-//                                    "Nenhum limite correspondente às colunas deste CSV para o servidor %s.%n", mac);
-//                        }
-//                    } catch (SQLException e) {
-//                        System.err.printf("Erro ao buscar limites de %s: %s%n", mac, e.getMessage());
-//                        // Evita repetir a mesma consulta com falha para cada linha desse servidor.
-//                        cachePorMac.put(mac, Map.of());
-//                    }
-//                }
-//
-//                Map<String, LimiteDao.Limite> limites = cachePorMac.get(mac);
-//                String timestamp = registro.getOrDefault(COLUNA_TIMESTAMP, "sem timestamp");
-//
-//                for (LimiteDao.Limite limite : limites.values()) {
-//                    String bruto = registro.get(limite.nomeColuna().toLowerCase(Locale.ROOT));
-//                    if (bruto == null || bruto.isBlank()) {
-//                        continue;
-//                    }
-//
-//                    double valor;
-//                    try {
-//                        valor = Double.parseDouble(bruto);
-//                    } catch (NumberFormatException e) {
-//                        // Métricas com valores não numéricos (ex.: estado de interface) não
-//                        // podem ser comparadas numericamente; ficam fora desta validação.
-//                        continue;
-//                    }
-//
-//                    String nivel = null;
-//                    Double limiteAtingido = null;
-//                    if (atingiuLimite(valor, limite.critico(), limite.operador())) {
-//                        nivel = "CRITICO";
-//                        limiteAtingido = limite.critico();
-//                    } else if (atingiuLimite(valor, limite.atencao(), limite.operador())) {
-//                        nivel = "ATENCAO";
-//                        limiteAtingido = limite.atencao();
-//                    }
-//
-//                    String chaveAlerta = mac + "|" + limite.nomeColuna() + "|" + nivel;
-//                    if (nivel != null && jaAlertados.add(chaveAlerta)) {
-//                        System.out.printf("[%s] %s | %s = %.2f %s (operador %s, limite %.2f) em %s%n",
-//                                nivel, mac, limite.nome(), valor, limite.unidade(),
-//                                limite.operador(), limiteAtingido, timestamp);
-//										if(nivel.equals("CRITICO") || nivel.equals("ATENCAO")) {
-//													String resumo = String.format(
-//								"[%s] %s - %s = %.2f %s (limite %.2f) em %s",
-//								nivel,mac,limite.nome(),valor,limite.unidade(),limiteAtingido,timestamp);
-//							criarTicket(jira,resumo);
-//						}
-//                    }
-//                }
-//            }
-
-            System.out.printf("Linhas lidas em '%s': %d%n", chave, linhasLidas);
-            return linhasLidas;
+            return totalLeituras;
         }
+    }
+    /**
+     * Encaminha os arrays principais do JSON para leitura.
+     *
+     * parâmetro tipo pode ser um Array de: metricas, processos ou containers.
+     */
+    private static int processarRegistros(
+            JsonParser parser,
+            String tipo,
+            String mac,
+            LimiteDao dao,
+            Map<String, LimiteDao.Limite> cacheLimites,
+            Set<String> metricasConsultadas
+    ) throws IOException {
+
+        return percorrerArray(parser, tipo, mac, dao,
+                cacheLimites, metricasConsultadas
+        );
+    }
+
+    /**
+     * Percorre os elementos de um array JSON.
+     *
+     * Cada elemento pode ser um objeto, outro array
+     * ou um valor simples.
+     *
+     * O método utiliza recursividade para permitir
+     * a leitura de arrays aninhados.
+     */
+    private static int percorrerArray(
+            JsonParser parser,
+            String caminho,
+            String mac,
+            LimiteDao dao,
+            Map<String, LimiteDao.Limite> cacheLimites,
+            Set<String> metricasConsultadas
+    ) throws IOException {
+
+        // Posição atual dentro do array.
+        int indice = 0;
+
+        // Quantidade de leituras válidas encontradas.
+        int total = 0;
+
+        JsonToken token;
+
+        // Percorre até encontrar o fechamento do array: ]
+        while ((token = parser.nextToken()) != JsonToken.END_ARRAY) {
+
+            if (token == null)
+                throw new IOException("Array JSON incompleto");
+
+            // Monta o caminho do elemento.
+            // Exemplo: metricas[0], metricas[1]...
+            String caminhoItem = caminho + "[" + indice + "]";
+
+            if (token == JsonToken.START_OBJECT) {
+
+                // Encontramos um objeto dentro do array.
+                // Encaminhamos sua leitura ao percorrerObjeto().
+                total += percorrerObjeto(
+                        parser,
+                        caminhoItem,
+                        mac,
+                        dao,
+                        cacheLimites,
+                        metricasConsultadas
+                );
+
+            } else if (token == JsonToken.START_ARRAY) {
+
+                // Encontramos outro array dentro do array atual.
+                // O método chama a si mesmo: recursividade.
+                total += percorrerArray(
+                        parser,
+                        caminhoItem,
+                        mac,
+                        dao,
+                        cacheLimites,
+                        metricasConsultadas
+                );
+            }
+
+            // Avança o índice do elemento.
+            indice++;
+        }
+
+        return total;
+    }
+
+    /**
+     * Percorre os campos de um objeto JSON.
+     *
+     * Se encontrar objetos ou arrays internos, chama
+     * os respectivos métodos recursivamente.
+     *
+     * Quando encontra uma leitura válida, encaminha
+     * seus dados para avaliarMetrica().
+     */
+    private static int percorrerObjeto(
+            JsonParser parser,
+            String caminho,
+            String mac,
+            LimiteDao dao,
+            Map<String, LimiteDao.Limite> cacheLimites,
+            Set<String> metricasConsultadas
+    ) throws IOException {
+
+        // Informações que caracterizam uma leitura de métrica.
+        // Cada chamada recursiva possui suas próprias variáveis.
+        String metrica = null;
+        String campoOrigem = null;
+        String status = null;
+        Double valor = null;
+
+        int total = 0;
+
+        JsonToken token;
+
+        // Percorre os campos até encontrar o fechamento: }
+        while ((token = parser.nextToken()) != JsonToken.END_OBJECT) {
+
+            if (token == null)
+                throw new IOException("Objeto JSON incompleto");
+
+            // Nome do campo que estamos analisando.
+            String campo = parser.currentName();
+
+            // Avança para o valor desse campo.
+            token = parser.nextToken();
+
+            if (token == null)
+                throw new IOException("Objeto JSON incompleto");
+
+            if (token == JsonToken.START_OBJECT) {
+
+                // Encontrou um objeto dentro do objeto atual.
+                // Faz outra chamada ao mesmo método.
+                total += percorrerObjeto(
+                        parser,
+                        caminho + "." + campo,
+                        mac,
+                        dao,
+                        cacheLimites,
+                        metricasConsultadas
+                );
+
+                // O objeto interno já foi percorrido.
+                // Continuamos com o próximo campo do objeto pai.
+                continue;
+            }
+
+            if (token == JsonToken.START_ARRAY) {
+
+                // Encontrou um array dentro do objeto.
+                // Encaminha sua leitura para percorrerArray().
+                total += percorrerArray(
+                        parser,
+                        caminho + "." + campo,
+                        mac,
+                        dao,
+                        cacheLimites,
+                        metricasConsultadas
+                );
+
+                continue;
+            }
+
+            // Se não for objeto nem array, verifica
+            // se é um dos campos necessários à leitura.
+            switch (campo) {
+
+                case "metrica" ->
+                        metrica = parser.getValueAsString();
+
+                case "campo_origem" ->
+                        campoOrigem = parser.getValueAsString();
+
+                case "status" ->
+                        status = parser.getValueAsString();
+
+                case "valor" -> {
+
+                    // Apenas valores numéricos podem ser
+                    // comparados com os limites atuais.
+                    if (token.isNumeric())
+                        valor = parser.getDoubleValue();
+                }
+            }
+        }
+
+        // A avaliação só acontece depois que terminamos
+        // de percorrer os campos do objeto atual.
+        if ("ok".equals(status)
+                && metrica != null
+                && !metrica.isBlank()
+                && valor != null
+                && Double.isFinite(valor)) {
+
+            // A leitura passou nas validações.
+            // Agora podemos consultar e comparar seus limites.
+            avaliarMetrica(
+                    mac,
+                    metrica,
+                    campoOrigem,
+                    valor,
+                    caminho,
+                    dao,
+                    cacheLimites,
+                    metricasConsultadas
+            );
+
+            total++;
+        }
+
+        return total;
+    }
+
+    /**
+     * Consulta os limites de uma métrica e verifica
+     * se seu valor representa atenção ou crítico.
+     *
+     * A leitura já deve ter sido validada antes
+     * de chegar a este método.
+     */
+    private static void avaliarMetrica(
+            String mac,
+            String metrica,
+            String campoOrigem,
+            double valor,
+            String recurso,
+            LimiteDao dao,
+            Map<String, LimiteDao.Limite> cacheLimites,
+            Set<String> metricasConsultadas
+    ) throws IOException {
+
+        // Consulta o banco apenas se a métrica ainda
+        // não foi consultada neste arquivo.
+        if (!metricasConsultadas.contains(metrica)) {
+
+            try {
+                // Busca os limites configurados para
+                // o MAC e o identificador da métrica.
+                Map<String, LimiteDao.Limite> encontrados =
+                        dao.buscarPorMac(mac, List.of(metrica));
+
+                // Tenta encontrar a configuração pela chave.
+                LimiteDao.Limite limite = encontrados.get(metrica);
+
+                if (limite == null) {
+
+                    // Alternativa: procura nos valores retornados.
+                    // Útil caso o mapa utilize outra normalização
+                    // para o nome da métrica.
+                    limite = encontrados.values().stream()
+                            .filter(l -> metrica.equalsIgnoreCase(l.nomeColuna()))
+                            .findFirst()
+                            .orElse(null);
+                }
+
+                // Se o banco retornou a configuração,
+                // guardamos no cache para reutilização.
+                if (limite != null)
+                    cacheLimites.put(metrica, limite);
+
+                // Marca como consultada mesmo sem limite encontrado.
+                // Evita repetir consultas sem resultado.
+                metricasConsultadas.add(metrica);
+
+            } catch (SQLException e) {
+                throw new IOException(
+                        "Erro ao buscar limites da métrica " + metrica,
+                        e
+                );
+            }
+        }
+
+        // Recupera a configuração já encontrada.
+        LimiteDao.Limite limite = cacheLimites.get(metrica);
+
+        // Métrica sem limite configurado não gera alerta.
+        if (limite == null)
+            return;
+
+        String nivel;
+        Double limiteAtingido;
+
+        // Verifica primeiro o limite crítico.
+        // Ele possui prioridade sobre o de atenção.
+        if (atingiuLimite(valor, limite.critico(), limite.operador())) {
+
+            nivel = "CRITICO";
+            limiteAtingido = limite.critico();
+
+        } else if (atingiuLimite(valor, limite.atencao(), limite.operador())) {
+
+            nivel = "ATENCAO";
+            limiteAtingido = limite.atencao();
+
+        } else {
+
+            // O valor não atingiu nenhum limite.
+            return;
+        }
+
+        // Por enquanto, apenas exibe a ocorrência.
+        // A integração com o Jira será adicionada depois.
+        System.out.printf(
+                "[%s] MAC: %s | Recurso: %s | Métrica: %s | " +
+                        "Origem: %s | Valor: %.2f | Operador: %s | Limite: %.2f%n",
+                nivel,
+                mac,
+                recurso,
+                metrica,
+                campoOrigem,
+                valor,
+                limite.operador(),
+                limiteAtingido
+        );
     }
 
     /** Avalia a métrica usando o operador configurado em componentes_perfil.operador. */
