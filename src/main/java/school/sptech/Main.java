@@ -1,5 +1,8 @@
 package school.sptech;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import school.sptech.client.MySqlProvider;
 import school.sptech.client.S3Provider;
 import school.sptech.config.Env;
@@ -15,6 +18,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -90,7 +94,7 @@ public class Main {
                                 : e.awsErrorDetails().errorMessage();
                         System.err.printf("Erro ao acessar o arquivo S3 '%s': %s%n", chave, mensagem);
                     } catch (IOException e) {
-                        System.err.printf("Erro ao ler o CSV '%s': %s%n", chave, e.getMessage());
+                        System.err.printf("Erro ao ler o JSON '%s': %s%n", chave, e.getMessage());
                     }
                 }
 
@@ -182,126 +186,159 @@ public class Main {
                 .key(chave)
                 .build();
 
-        System.out.println(request);
+        // Cria uma fábrica de Parsers (Analisadores)
+        JsonFactory factory = new JsonFactory();
 
-        try (ResponseInputStream<GetObjectResponse> stream = s3.getObject(request);
-             BufferedReader reader = new BufferedReader(
-                     new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+        try (InputStream inputStream = s3.getObject(request);
+             //Criar um parser que é concetado ao conteúdo recebido do S3
+             JsonParser parser = factory.createParser(inputStream);
+        ) {
 
-            String linhaCabecalho = reader.readLine();
-            if (linhaCabecalho == null) {
-                System.err.println("Arquivo vazio; ignorando: " + chave);
-                return 0;
+            // O JsonParser transforma estrutura do Json em um sequência de tokens
+            // A leitura dele ocorre dessa maneira onde cada campo seria o TOKEN:
+//            START_OBJECT
+//            {
+//                FIELD_NAME
+//                TIMESTAMP
+//
+//                VALUESTRING
+//                2026-11-02T20:30:00
+//
+//                FILEDNAME
+//                CPU_PERCENT
+//
+//                VALUE_NUMBER_FLOAT
+//                95.5
+//
+//                END_OBJECT
+//            }
+            while (parser.nextToken() != null) {
+                if (parser.currentToken() == JsonToken.FIELD_NAME) {
+                    String campo = parser.currentName();
+
+                    parser.nextToken();
+
+                    if (campo.equals("CPU_PERCENT")) {
+                        double valor = parser.getDoubleValue();
+                        System.out.println(valor);
+                    }
+                }
             }
 
-            // Normalizamos os nomes das colunas para minúsculas; os valores não são alterados.
-            List<String> colunas = parseCsvLine(linhaCabecalho.replace("\uFEFF", "")).stream()
-                    .map(String::trim)
-                    .map(nome -> nome.toLowerCase(Locale.ROOT))
-                    .toList();
-
-            if (colunas.stream().noneMatch(COLUNA_MAC::equals)) {
-                System.err.printf(
-                        "CSV '%s' ignorado: o cabeçalho precisa conter a coluna '%s'.%n",
-                        chave, COLUNA_MAC);
-                return 0;
-            }
-
-            // Passamos os nomes dinâmicos das colunas ao DAO. O banco retornará somente
-            // as que existirem em componentes.nome_coluna, estiverem associadas ao perfil
-            // do MAC e possuírem limite de atenção ou crítico configurado.
-            List<String> colunasMetricas = colunas.stream()
-                    .filter(nome -> !nome.isBlank())
-                    .filter(nome -> !nome.equals(COLUNA_MAC))
-                    .filter(nome -> !nome.equals(COLUNA_TIMESTAMP))
-                    .distinct()
-                    .toList();
-
-            System.out.println("Colunas no CSV: " + String.join(", ", colunas));
-            System.out.println("Colunas candidatas a métricas: " + String.join(", ", colunasMetricas));
-
-            Map<String, Map<String, LimiteDao.Limite>> cachePorMac = new HashMap<>();
+//            String linhaCabecalho = null;
+//            if (linhaCabecalho == null) {
+//                System.err.println("Arquivo vazio; ignorando: " + chave);
+//                return 0;
+//            }
+//
+//            // Normalizamos os nomes das colunas para minúsculas; os valores não são alterados.
+//            List<String> colunas = parseCsvLine(linhaCabecalho.replace("\uFEFF", "")).stream()
+//                    .map(String::trim)
+//                    .map(nome -> nome.toLowerCase(Locale.ROOT))
+//                    .toList();
+//
+//            if (colunas.stream().noneMatch(COLUNA_MAC::equals)) {
+//                System.err.printf(
+//                        "CSV '%s' ignorado: o cabeçalho precisa conter a coluna '%s'.%n",
+//                        chave, COLUNA_MAC);
+//                return 0;
+//            }
+//
+//            // Passamos os nomes dinâmicos das colunas ao DAO. O banco retornará somente
+//            // as que existirem em componentes.nome_coluna, estiverem associadas ao perfil
+//            // do MAC e possuírem limite de atenção ou crítico configurado.
+//            List<String> colunasMetricas = colunas.stream()
+//                    .filter(nome -> !nome.isBlank())
+//                    .filter(nome -> !nome.equals(COLUNA_MAC))
+//                    .filter(nome -> !nome.equals(COLUNA_TIMESTAMP))
+//                    .distinct()
+//                    .toList();
+//
+//            System.out.println("Colunas no CSV: " + String.join(", ", colunas));
+//            System.out.println("Colunas candidatas a métricas: " + String.join(", ", colunasMetricas));
+//
+//            Map<String, Map<String, LimiteDao.Limite>> cachePorMac = new HashMap<>();
             int linhasLidas = 0;
             String linha;
             int numeroLinha = 1;
 
-            while ((linha = reader.readLine()) != null) {
-                numeroLinha++;
-                if (linha.isBlank()) {
-                    continue;
-                }
-
-                List<String> valores = parseCsvLine(linha);
-                Map<String, String> registro = new LinkedHashMap<>();
-                for (int i = 0; i < colunas.size(); i++) {
-                    registro.put(colunas.get(i), i < valores.size() ? valores.get(i).trim() : "");
-                }
-                linhasLidas++;
-
-                String mac = registro.get(COLUNA_MAC);
-                if (mac == null || mac.isBlank()) {
-                    System.err.printf("Linha %d do arquivo '%s' ignorada: endereco_mac vazio.%n",
-                            numeroLinha, chave);
-                    continue;
-                }
-
-                if (!cachePorMac.containsKey(mac)) {
-                    try {
-                        Map<String, LimiteDao.Limite> limites = dao.buscarPorMac(mac, colunasMetricas);
-                        cachePorMac.put(mac, limites);
-                        if (limites.isEmpty()) {
-                            System.out.printf(
-                                    "Nenhum limite correspondente às colunas deste CSV para o servidor %s.%n", mac);
-                        }
-                    } catch (SQLException e) {
-                        System.err.printf("Erro ao buscar limites de %s: %s%n", mac, e.getMessage());
-                        // Evita repetir a mesma consulta com falha para cada linha desse servidor.
-                        cachePorMac.put(mac, Map.of());
-                    }
-                }
-
-                Map<String, LimiteDao.Limite> limites = cachePorMac.get(mac);
-                String timestamp = registro.getOrDefault(COLUNA_TIMESTAMP, "sem timestamp");
-
-                for (LimiteDao.Limite limite : limites.values()) {
-                    String bruto = registro.get(limite.nomeColuna().toLowerCase(Locale.ROOT));
-                    if (bruto == null || bruto.isBlank()) {
-                        continue;
-                    }
-
-                    double valor;
-                    try {
-                        valor = Double.parseDouble(bruto);
-                    } catch (NumberFormatException e) {
-                        // Métricas com valores não numéricos (ex.: estado de interface) não
-                        // podem ser comparadas numericamente; ficam fora desta validação.
-                        continue;
-                    }
-
-                    String nivel = null;
-                    Double limiteAtingido = null;
-                    if (atingiuLimite(valor, limite.critico(), limite.operador())) {
-                        nivel = "CRITICO";
-                        limiteAtingido = limite.critico();
-                    } else if (atingiuLimite(valor, limite.atencao(), limite.operador())) {
-                        nivel = "ATENCAO";
-                        limiteAtingido = limite.atencao();
-                    }
-
-                    String chaveAlerta = mac + "|" + limite.nomeColuna() + "|" + nivel;
-                    if (nivel != null && jaAlertados.add(chaveAlerta)) {
-                        System.out.printf("[%s] %s | %s = %.2f %s (operador %s, limite %.2f) em %s%n",
-                                nivel, mac, limite.nome(), valor, limite.unidade(),
-                                limite.operador(), limiteAtingido, timestamp);
-										if(nivel.equals("CRITICO") || nivel.equals("ATENCAO")) {
-													String resumo = String.format(
-								"[%s] %s - %s = %.2f %s (limite %.2f) em %s",
-								nivel,mac,limite.nome(),valor,limite.unidade(),limiteAtingido,timestamp);
-							criarTicket(jira,resumo);
-						}
-                    }
-                }
-            }
+//            while ((linha = reader.readLine()) != null) {
+//                numeroLinha++;
+//                if (linha.isBlank()) {
+//                    continue;
+//                }
+//
+//                List<String> valores = parseCsvLine(linha);
+//                Map<String, String> registro = new LinkedHashMap<>();
+//                for (int i = 0; i < colunas.size(); i++) {
+//                    registro.put(colunas.get(i), i < valores.size() ? valores.get(i).trim() : "");
+//                }
+//                linhasLidas++;
+//
+//                String mac = registro.get(COLUNA_MAC);
+//                if (mac == null || mac.isBlank()) {
+//                    System.err.printf("Linha %d do arquivo '%s' ignorada: endereco_mac vazio.%n",
+//                            numeroLinha, chave);
+//                    continue;
+//                }
+//
+//                if (!cachePorMac.containsKey(mac)) {
+//                    try {
+//                        Map<String, LimiteDao.Limite> limites = dao.buscarPorMac(mac, colunasMetricas);
+//                        cachePorMac.put(mac, limites);
+//                        if (limites.isEmpty()) {
+//                            System.out.printf(
+//                                    "Nenhum limite correspondente às colunas deste CSV para o servidor %s.%n", mac);
+//                        }
+//                    } catch (SQLException e) {
+//                        System.err.printf("Erro ao buscar limites de %s: %s%n", mac, e.getMessage());
+//                        // Evita repetir a mesma consulta com falha para cada linha desse servidor.
+//                        cachePorMac.put(mac, Map.of());
+//                    }
+//                }
+//
+//                Map<String, LimiteDao.Limite> limites = cachePorMac.get(mac);
+//                String timestamp = registro.getOrDefault(COLUNA_TIMESTAMP, "sem timestamp");
+//
+//                for (LimiteDao.Limite limite : limites.values()) {
+//                    String bruto = registro.get(limite.nomeColuna().toLowerCase(Locale.ROOT));
+//                    if (bruto == null || bruto.isBlank()) {
+//                        continue;
+//                    }
+//
+//                    double valor;
+//                    try {
+//                        valor = Double.parseDouble(bruto);
+//                    } catch (NumberFormatException e) {
+//                        // Métricas com valores não numéricos (ex.: estado de interface) não
+//                        // podem ser comparadas numericamente; ficam fora desta validação.
+//                        continue;
+//                    }
+//
+//                    String nivel = null;
+//                    Double limiteAtingido = null;
+//                    if (atingiuLimite(valor, limite.critico(), limite.operador())) {
+//                        nivel = "CRITICO";
+//                        limiteAtingido = limite.critico();
+//                    } else if (atingiuLimite(valor, limite.atencao(), limite.operador())) {
+//                        nivel = "ATENCAO";
+//                        limiteAtingido = limite.atencao();
+//                    }
+//
+//                    String chaveAlerta = mac + "|" + limite.nomeColuna() + "|" + nivel;
+//                    if (nivel != null && jaAlertados.add(chaveAlerta)) {
+//                        System.out.printf("[%s] %s | %s = %.2f %s (operador %s, limite %.2f) em %s%n",
+//                                nivel, mac, limite.nome(), valor, limite.unidade(),
+//                                limite.operador(), limiteAtingido, timestamp);
+//										if(nivel.equals("CRITICO") || nivel.equals("ATENCAO")) {
+//													String resumo = String.format(
+//								"[%s] %s - %s = %.2f %s (limite %.2f) em %s",
+//								nivel,mac,limite.nome(),valor,limite.unidade(),limiteAtingido,timestamp);
+//							criarTicket(jira,resumo);
+//						}
+//                    }
+//                }
+//            }
 
             System.out.printf("Linhas lidas em '%s': %d%n", chave, linhasLidas);
             return linhasLidas;
