@@ -70,18 +70,18 @@ public class Main {
 
                 if (chavesCsv.isEmpty()) {
                     System.out.printf(
-                            "Nenhum arquivo CSV encontrado no bucket '%s' com o prefixo configurado.%n",
+                            "Nenhum objeto JSON encontrado no bucket '%s' com o prefixo configurado.%n",
                             bucketName);
                     return;
                 }
 
-                System.out.printf("Arquivos CSV encontrados: %d%n", chavesCsv.size());
+                System.out.printf("Objetos JSON encontrados: %d%n", chavesCsv.size());
                 int totalLinhas = 0;
                 int arquivosProcessados = 0;
 
                 for (String chave : chavesCsv) {
                     try {
-                        totalLinhas += processarCsv(
+                        totalLinhas += processarJson(
                                 s3Client, bucketName, chave, dao, jira, jaAlertados);
                         arquivosProcessados++;
                     } catch (S3Exception e) {
@@ -131,10 +131,8 @@ public class Main {
             return List.of(chaveUnica);
         }
 
-        String prefixo = Env.get("S3_PREFIX", "03-gold/").trim();
-        if (prefixo.isEmpty()) {
-            prefixo = "client/";
-        } else if (!prefixo.endsWith("/")) {
+        String prefixo = Env.get("S3_PREFIX", "client/lotes").trim();
+        if (!prefixo.endsWith("/")) {
             prefixo += "/";
         }
 
@@ -147,7 +145,8 @@ public class Main {
         for (var pagina : s3.listObjectsV2Paginator(request)) {
             for (S3Object objeto : pagina.contents()) {
                 String chave = objeto.key();
-                if (chave != null && chave.toLowerCase(Locale.ROOT).endsWith(".csv")) {
+
+                if (chave != null && chave.toLowerCase(Locale.ROOT).endsWith(".json")) {
                     chaves.add(chave);
                 }
             }
@@ -168,7 +167,7 @@ public class Main {
      * Processa um arquivo por vez. O cache de limites é local ao arquivo porque
      * arquivos diferentes podem ter conjuntos de colunas diferentes.
      */
-    private static int processarCsv(
+    private static int processarJson(
             S3Client s3,
             String bucket,
             String chave,
@@ -176,12 +175,14 @@ public class Main {
             Jira jira,
             Set<String> jaAlertados) throws IOException {
 
-        System.out.println("\nProcessando CSV: " + chave);
+        System.out.println("\nProcessando JSON: " + chave);
 
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(chave)
                 .build();
+
+        System.out.println(request);
 
         try (ResponseInputStream<GetObjectResponse> stream = s3.getObject(request);
              BufferedReader reader = new BufferedReader(
