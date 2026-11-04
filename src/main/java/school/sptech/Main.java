@@ -555,43 +555,30 @@ public class Main {
             Set<String> metricasConsultadas
     ) throws IOException {
 
-        // Consulta o banco apenas se a métrica ainda
-        // não foi consultada neste arquivo.
+        // Consulta os limites apenas uma vez para cada métrica
+        // encontrada no arquivo.
         if (!metricasConsultadas.contains(metrica)) {
-
             try {
-                // Busca os limites configurados para
-                // o MAC e o identificador da métrica.
                 Map<String, LimiteDao.Limite> encontrados =
                         dao.buscarPorMac(mac, List.of(metrica));
 
-                // Tenta encontrar a configuração pela chave.
-                LimiteDao.Limite limite = encontrados.get(metrica);
+                // O DAO retorna as chaves em minúsculas.
+                String chaveMetrica = metrica.toLowerCase(Locale.ROOT);
 
-                if (limite == null) {
+                LimiteDao.Limite limite = encontrados.get(chaveMetrica);
 
-                    // Alternativa: procura nos valores retornados.
-                    // Útil caso o mapa utilize outra normalização
-                    // para o nome da métrica.
-                    limite = encontrados.values().stream()
-                            .filter(l -> metrica.equalsIgnoreCase(l.nomeColuna()))
-                            .findFirst()
-                            .orElse(null);
+                // Armazena somente as métricas que possuem limites.
+                if (limite != null) {
+                    cacheLimites.put(metrica, limite);
                 }
 
-                // Se o banco retornou a configuração,
-                // guardamos no cache para reutilização.
-                if (limite != null)
-                    cacheLimites.put(metrica, limite);
-
-                // Marca como consultada mesmo sem limite encontrado.
-                // Evita repetir consultas sem resultado.
+                // Registra que essa métrica já foi consultada,
+                // mesmo quando não existe limite no banco.
                 metricasConsultadas.add(metrica);
 
             } catch (SQLException e) {
                 throw new IOException(
-                        "Erro ao buscar limites da métrica " + metrica,
-                        e
+                        "Erro ao buscar limites para " + metrica, e
                 );
             }
         }
