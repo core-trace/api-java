@@ -210,6 +210,8 @@ public class Main {
                         System.err.println(
                                 "[ERRO JSON] " + chave + ": " + e.getMessage()
                         );
+
+                        e.printStackTrace();
                     }
                 }
 
@@ -439,7 +441,8 @@ public class Main {
         // O mapa contém somente as ocorrências selecionadas
         // após a aplicação da prioridade de gravidade.
 
-        System.out.printf(
+        if (chave != null && chave.toLowerCase(Locale.ROOT).endsWith(".json"))
+            System.out.printf(
                 "MAC: %s | Lote: %s | Leituras válidas: %d%n",
                 mac, loteId, totalLeituras
         );
@@ -462,18 +465,10 @@ public class Main {
                     alerta.limite()
             );
 
-                // Futuramente:
-                // criarTicket(jira, ...);
-        }
-
-        // Confirma que o documento possui seus
-        // identificadores obrigatórios.
-        if (mac == null || mac.isBlank()
-                || loteId == null || loteId.isBlank()) {
-
-            throw new IOException(
-                    "JSON sem MAC ou lote_id válido: " + chave
-            );
+            // Cria um chamado no Jira para esta ocorrência.
+            // Se houver erro, o método lança uma exceção,
+            // impedindo a criação do marcador .ok.
+            criarTicket(jira, alerta);
         }
 
         return totalLeituras;
@@ -1129,20 +1124,65 @@ public class Main {
         );
     }
 
-    private static void criarTicket(Jira jira, String resumo) {
+    /**
+     * Cria um chamado no Jira a partir de uma
+     * ocorrência identificada pelo CoreTrace.
+     *
+     * Se ocorrer algum erro, a exceção é propagada
+     * para impedir que o arquivo receba um .ok.
+     */
+    private static void criarTicket(
+            Jira jira,
+            Ocorrencia alerta
+    ) throws IOException {
+
+        // Monta o resumo utilizando os dados
+        // identificados durante a análise.
+        String resumo = String.format(
+                "[%s] %s | %s | %s = %.2f (%s %.2f)",
+                alerta.nivel(),
+                alerta.mac(),
+                alerta.recurso(),
+                alerta.metrica(),
+                alerta.valor(),
+                alerta.operador(),
+                alerta.limite()
+        );
+
+        // Evita ultrapassar o tamanho máximo
+        // do campo Summary do Jira.
+        if (resumo.length() > 255)
+            resumo = resumo.substring(0, 255);
+
         try {
+
+            // Envia o chamado para o projeto configurado.
             String resposta = jira.createIssue(
                     Env.require("JIRA_PROJECT_KEY"),
                     resumo,
-                    Env.get("JIRA_ISSUE_TYPE", "Task"));
-            System.out.println("  -> Ticket criado: " + resposta);
-        } catch (IOException e) {
-            System.err.println("  -> Erro de rede ao criar ticket: " + e.getMessage());
+                    Env.get("JIRA_ISSUE_TYPE", "Task")
+            );
+
+            System.out.println(
+                    "[JIRA] Chamado criado: " + resposta
+            );
+
         } catch (InterruptedException e) {
+
+            // Preserva a interrupção da thread.
             Thread.currentThread().interrupt();
-            System.err.println("  -> Criação do ticket interrompida.");
+
+            throw new IOException(
+                    "Criação do chamado interrompida", e
+            );
+
         } catch (RuntimeException e) {
-            System.err.println("  -> Jira recusou o ticket: " + e.getMessage());
+
+            // Erros de configuração ou resposta do Jira
+            // também impedem concluir o processamento.
+            throw new IOException(
+                    "Erro ao criar chamado no Jira", e
+            );
         }
     }
 
