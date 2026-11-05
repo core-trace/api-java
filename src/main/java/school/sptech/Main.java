@@ -8,10 +8,9 @@ import school.sptech.client.S3Provider;
 import school.sptech.config.Env;
 import school.sptech.config.Jira;
 import school.sptech.docker.LimiteDao;
-import software.amazon.awssdk.core.ResponseInputStream;
+import school.sptech.s3.LoteS3Service;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
@@ -20,10 +19,8 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.time.Instant;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -45,17 +42,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class Main {
 
-    private static final String COLUNA_MAC = "endereco_mac";
-    private static final String COLUNA_TIMESTAMP = "timestamp";
-
     /**
-     * Representa uma ocorrência identificada durante
-     * a análise das métricas.
-     *
-     * Ainda não é um chamado do Jira.
-     * É apenas o resultado de uma comparação com o banco.
+     * Representa uma ocorrência identificada
+     * durante a análise das métricas.
      */
-    private record Ocorrencia(
+    public record Ocorrencia(
             String mac,
             String recurso,
             String metrica,
@@ -129,46 +120,61 @@ public class Main {
     }
 
     private static void executarProcessamento() {
+
         try {
             validarConfiguracao();
 
             String bucketName = Env.require("S3_BUCKET");
+
             LimiteDao dao = new LimiteDao(new MySqlProvider());
             Jira jira = criarJira();
+
             Set<String> jaAlertados = new HashSet<>();
 
             try (S3Client s3Client = new S3Provider().getS3Client()) {
-                List<String> chavesCsv = obterChavesCsv(s3Client, bucketName);
 
-                if (chavesCsv.isEmpty()) {
-                    System.out.printf(
-                            "Nenhum objeto JSON encontrado no bucket '%s' com o prefixo configurado.%n",
-                            bucketName);
+                // Instancia o serviço responsável pelos lotes do S3.
+                LoteS3Service loteService = new LoteS3Service(
+                        s3Client,
+                        bucketName
+                );
+
+                // Agora a listagem é responsabilidade do serviço.
+                List<String> chavesJson =
+                        loteService.obterChavesCaptura();
+
+                if (chavesJson.isEmpty()) {
+                    System.out.println(
+                            "Nenhum JSON encontrado no S3."
+                    );
                     return;
                 }
 
-                System.out.printf("Objetos JSON encontrados: %d%n", chavesCsv.size());
+                System.out.printf(
+                        "Objetos JSON encontrados: %d%n",
+                        chavesJson.size()
+                );
+
                 int totalLinhas = 0;
                 int arquivosProcessados = 0;
 
-                for (String chave : chavesCsv) {
+                for (String chave : chavesJson) {
 
                     try {
 
-                        // 1. Verifica se já existe um .ok no S3.
-                        // Se existir, o arquivo não precisa ser lido novamente.
-                        if (loteJaProcessado(s3Client, bucketName, chave)) {
+                        // Verifica se o lote já foi processado.
+                        if (loteService.loteJaProcessado(chave)) {
 
                             System.out.println(
-                                    "[IGNORADO] Arquivo já processado: " + chave
+                                    "[IGNORADO] Arquivo já processado: "
+                                            + chave
                             );
 
                             continue;
                         }
 
-                        // 2. Se não existe .ok, processa o JSON.
-                        // Isso inclui a leitura das métricas,
-                        // consulta ao MySQL e comparação com os limites.
+                        // Continua utilizando o processarJson()
+                        // que ainda está dentro da Main.
                         int leituras = processarJson(
                                 s3Client,
                                 bucketName,
@@ -178,18 +184,11 @@ public class Main {
                                 jaAlertados
                         );
 
-                        // 3. O método terminou sem lançar exceção.
-                        // Atualiza as estatísticas da execução.
+                        // Só marca depois do processamento completo.
+                        loteService.marcarLoteProcessado(chave);
+
                         totalLinhas += leituras;
                         arquivosProcessados++;
-
-                        // 4. Registra no S3 que o JSON foi processado.
-                        // Por enquanto, usamos o prefixo de testes.
-                        marcarLoteProcessado(
-                                s3Client,
-                                bucketName,
-                                chave
-                        );
 
                         System.out.println(
                                 "[SUCESSO] Arquivo processado: " + chave
@@ -197,34 +196,40 @@ public class Main {
 
                     } catch (S3Exception e) {
 
-                        // Problemas no S3 não geram marcador.
-                        // O arquivo poderá ser reprocessado.
                         System.err.println(
-                                "[ERRO S3] " + chave + ": " + e.getMessage()
+                                "[ERRO S3] " + chave + ": "
+                                        + e.getMessage()
                         );
 
                     } catch (IOException e) {
 
-                        // Falhas na leitura ou comparação também
-                        // impedem a criação do marcador.
                         System.err.println(
-                                "[ERRO JSON] " + chave + ": " + e.getMessage()
+                                "[ERRO PROCESSAMENTO] " + chave
+                                        + ": " + e.getMessage()
                         );
 
                         e.printStackTrace();
                     }
                 }
 
-                System.out.printf("Processamento concluído. Arquivos processados: %d; linhas lidas: %d.%n",
-                        arquivosProcessados, totalLinhas);
+                System.out.printf(
+                        "Processamento concluído. Arquivos: %d; Leituras: %d%n",
+                        arquivosProcessados,
+                        totalLinhas
+                );
             }
+
         } catch (S3Exception e) {
-            String mensagem = e.awsErrorDetails() == null
-                    ? e.getMessage()
-                    : e.awsErrorDetails().errorMessage();
-            System.err.println("Erro ao listar ou acessar o S3: " + mensagem);
+
+            System.err.println(
+                    "Erro ao acessar S3: " + e.getMessage()
+            );
+
         } catch (IllegalStateException e) {
-            System.err.println("Erro de configuração: " + e.getMessage());
+
+            System.err.println(
+                    "Erro de configuração: " + e.getMessage()
+            );
         }
     }
 
@@ -242,42 +247,7 @@ public class Main {
         // Caso contrário, listamos os CSVs que estiverem em S3_PREFIX.
     }
 
-    /**
-     * Para compatibilidade, S3_KEY seleciona um único arquivo se estiver preenchido.
-     * Sem S3_KEY, o sistema descobre todos os arquivos .csv dentro de S3_PREFIX.
-     */
-    private static List<String> obterChavesCsv(S3Client s3, String bucket) {
-        String chaveUnica = Env.get("S3_KEY", "").trim();
-        if (!chaveUnica.isEmpty()) {
-            return List.of(chaveUnica);
-        }
 
-        String prefixo = Env.get("S3_PREFIX", "client/lotes").trim();
-        if (!prefixo.endsWith("/")) {
-            prefixo += "/";
-        }
-
-        List<String> chaves = new ArrayList<>();
-        ListObjectsV2Request request = ListObjectsV2Request.builder()
-                .bucket(bucket)
-                .prefix(prefixo)
-                .build();
-
-        for (var pagina : s3.listObjectsV2Paginator(request)) {
-            for (S3Object objeto : pagina.contents()) {
-                String chave = objeto.key();
-
-                // Busca apenas arquivos de captura.
-                // Outros arquivos JSON não entram no processamento.
-                if (chave != null && chave.endsWith("/capturas.json")) {
-                    chaves.add(chave);
-                }
-            }
-        }
-
-        chaves.sort(Comparator.naturalOrder());
-        return chaves;
-    }
 
     private static Jira criarJira() {
         String url = Env.require("JIRA_BASE_URL").replaceAll("/+$", "");
@@ -1002,7 +972,7 @@ public class Main {
      * Resultado:
      * client/controle/processados/maquina=01/lote=abc/capturas.json.ok
      */
-    private static String chaveMarcador(String chave) {
+    public static String chaveMarcador(String chave) {
         // Prefixo onde o Python envia os arquivos JSON.
         String prefixoCapturas = Env.get(
                 "S3_PREFIX", "client/lotes/"
@@ -1038,90 +1008,6 @@ public class Main {
                 chave.substring(prefixoCapturas.length());
 
         return prefixoProcessados + caminhoRelativo + ".ok";
-    }
-
-    /**
-     * Verifica se o JSON já foi processado anteriormente.
-     *
-     * Utiliza headObject(), que consulta o objeto no S3
-     * sem precisar baixar seu conteúdo.
-     *
-     * Retorna:
-     * true  -> marcador encontrado
-     * false -> marcador não existe
-     *
-     * Erros de permissão ou de serviço são propagados.
-     */
-    private static boolean loteJaProcessado(
-            S3Client s3,
-            String bucket,
-            String chave
-    ) {
-
-        // Descobre o caminho do .ok correspondente.
-        String marcador = chaveMarcador(chave);
-
-        HeadObjectRequest request = HeadObjectRequest.builder()
-                .bucket(bucket)
-                .key(marcador)
-                .build();
-
-        try {
-
-            // Se a chamada funcionar, o objeto existe.
-            s3.headObject(request);
-
-            return true;
-
-        } catch (S3Exception e) {
-
-            // 404 indica que o marcador não foi encontrado.
-            if (e.statusCode() == 404)
-                return false;
-
-            // Não devemos tratar erros 403, 500 etc.
-            // como se o arquivo ainda não existisse.
-            throw e;
-        }
-    }
-
-    /**
-     * Cria o arquivo .ok no S3, registrando que
-     * determinada captura foi processada com sucesso.
-     *
-     * Deve ser executado somente depois de todas
-     * as etapas obrigatórias do processamento.
-     */
-    private static void marcarLoteProcessado(
-            S3Client s3,
-            String bucket,
-            String chave
-    ) {
-
-        String marcador = chaveMarcador(chave);
-
-        // Informações simples para auditoria.
-        String conteudo = "STATUS=PROCESSADO\n"
-                + "ORIGEM=" + chave + "\n"
-                + "DATA=" + Instant.now();
-
-        // Requisição para criar o marcador no bucket.
-        PutObjectRequest request = PutObjectRequest.builder()
-                .bucket(bucket)
-                .key(marcador)
-                .contentType("text/plain")
-                .build();
-
-        // Envia o conteúdo como texto para o S3.
-        // Se a operação falhar, lança exceção.
-        s3.putObject(
-                request,
-                RequestBody.fromString(conteudo)
-        );
-
-        System.out.println(
-                "Marcador criado com sucesso: " + marcador
-        );
     }
 
     /**
@@ -1320,36 +1206,5 @@ public class Main {
                     "SHA-256 indisponível", e
             );
         }
-    }
-
-    /**
-     * Faz o parsing de uma linha CSV, respeitando campos entre aspas e vírgulas
-     * dentro desses campos. O leitor considera uma linha física por registro.
-     */
-    private static List<String> parseCsvLine(String linha) {
-        List<String> campos = new ArrayList<>();
-        StringBuilder campoAtual = new StringBuilder();
-        boolean dentroDeAspas = false;
-
-        for (int i = 0; i < linha.length(); i++) {
-            char caractere = linha.charAt(i);
-
-            if (caractere == '"') {
-                if (dentroDeAspas && i + 1 < linha.length() && linha.charAt(i + 1) == '"') {
-                    campoAtual.append('"');
-                    i++;
-                } else {
-                    dentroDeAspas = !dentroDeAspas;
-                }
-            } else if (caractere == ',' && !dentroDeAspas) {
-                campos.add(campoAtual.toString());
-                campoAtual.setLength(0);
-            } else {
-                campoAtual.append(caractere);
-            }
-        }
-
-        campos.add(campoAtual.toString());
-        return campos;
     }
 }
