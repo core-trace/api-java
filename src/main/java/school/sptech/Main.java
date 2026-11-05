@@ -44,6 +44,24 @@ public class Main {
     private static final String COLUNA_MAC = "endereco_mac";
     private static final String COLUNA_TIMESTAMP = "timestamp";
 
+    /**
+     * Representa uma ocorrência identificada durante
+     * a análise das métricas.
+     *
+     * Ainda não é um chamado do Jira.
+     * É apenas o resultado de uma comparação com o banco.
+     */
+    private record Ocorrencia(
+            String mac,
+            String recurso,
+            String metrica,
+            String campoOrigem,
+            double valor,
+            String nivel,
+            String operador,
+            double limite
+    ) {}
+
     public static void main(String[] args) {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
@@ -58,6 +76,52 @@ public class Main {
                 System.out.println("Erro: " + e.getMessage());
             }
         }, 0, 5, TimeUnit.MINUTES);
+    }
+
+    /**
+     * Registra uma ocorrência no lote.
+     *
+     * Caso já exista uma ocorrência para a mesma
+     * máquina, recurso e métrica, mantém a maior gravidade.
+     *
+     * CRITICO > ATENCAO.
+     */
+    private static void registrarOcorrencia(
+            Map<String, Ocorrencia> ocorrencias,
+            Ocorrencia nova
+    ) {
+
+        // Monta uma identificação para a ocorrência.
+        // Incluímos campoOrigem para distinguir leituras
+        // diferentes que compartilham o mesmo nome de métrica.
+        String chave = String.join("|",
+                nova.mac(),
+                nova.recurso(),
+                nova.metrica(),
+                nova.campoOrigem() == null ? "" : nova.campoOrigem()
+        );
+
+        Ocorrencia anterior = ocorrencias.get(chave);
+
+        // Primeira ocorrência desse recurso e métrica.
+        if (anterior == null) {
+            ocorrencias.put(chave, nova);
+            return;
+        }
+
+        // Crítico sempre prevalece sobre atenção.
+        if (nova.nivel().equals("CRITICO")
+                && anterior.nivel().equals("ATENCAO")) {
+
+            ocorrencias.put(chave, nova);
+            return;
+        }
+
+        // Se ambas possuem a mesma gravidade,
+        // mantém a última ocorrência processada.
+        if (nova.nivel().equals(anterior.nivel())) {
+            ocorrencias.put(chave, nova);
+        }
     }
 
     private static void executarProcessamento() {
@@ -219,6 +283,10 @@ public class Main {
         // que não possuem limites cadastrados.
         Set<String> metricasConsultadas = new HashSet<>();
 
+        // Acumula as ocorrências deste arquivo.
+        // LinkedHashMap mantém a ordem de inserção.
+        Map<String, Ocorrencia> alertasDoLote = new LinkedHashMap<>();
+
         try (
                 // Abre um fluxo de bytes diretamente do S3.
                 InputStream inputStream = s3.getObject(request);
@@ -302,7 +370,8 @@ public class Main {
                                 mac,
                                 dao,
                                 cacheLimites,
-                                metricasConsultadas
+                                metricasConsultadas,
+                                alertasDoLote
                         );
                     }
 
@@ -312,13 +381,39 @@ public class Main {
                 }
             }
 
+        }
+        // Neste ponto, o JSON inteiro já foi processado.
+        // O mapa contém somente as ocorrências selecionadas
+        // após a aplicação da prioridade de gravidade.
+
+        System.out.printf(
+                "MAC: %s | Lote: %s | Leituras válidas: %d%n",
+                mac, loteId, totalLeituras
+        );
+
+        System.out.println(
+                "Ocorrências agrupadas: " + alertasDoLote.size()
+        );
+
+        for (Ocorrencia alerta : alertasDoLote.values()) {
+
             System.out.printf(
-                    "MAC: %s | Lote: %s | Leituras válidas: %d%n",
-                    mac, loteId, totalLeituras
+                    "[%s] %s | %s | %s = %.2f " +
+                            "(%s %.2f)%n",
+                    alerta.nivel(),
+                    alerta.mac(),
+                    alerta.recurso(),
+                    alerta.metrica(),
+                    alerta.valor(),
+                    alerta.operador(),
+                    alerta.limite()
             );
 
-            return totalLeituras;
+                // Futuramente:
+                // criarTicket(jira, ...);
         }
+
+        return totalLeituras;
     }
     /**
      * Encaminha os arrays principais do JSON para leitura.
@@ -331,11 +426,19 @@ public class Main {
             String mac,
             LimiteDao dao,
             Map<String, LimiteDao.Limite> cacheLimites,
-            Set<String> metricasConsultadas
+            Set<String> metricasConsultadas,
+            Map<String, Ocorrencia> alertasDoLote
     ) throws IOException {
 
-        return percorrerArray(parser, tipo, null, mac, dao,
-                cacheLimites, metricasConsultadas
+        return percorrerArray(
+                parser,
+                tipo,
+                null,
+                mac,
+                dao,
+                cacheLimites,
+                metricasConsultadas,
+                alertasDoLote
         );
     }
 
@@ -355,7 +458,8 @@ public class Main {
             String mac,
             LimiteDao dao,
             Map<String, LimiteDao.Limite> cacheLimites,
-            Set<String> metricasConsultadas
+            Set<String> metricasConsultadas,
+            Map<String, Ocorrencia> alertasDoLote
     ) throws IOException {
 
         // Posição atual dentro do array.
@@ -389,7 +493,8 @@ public class Main {
                         mac,
                         dao,
                         cacheLimites,
-                        metricasConsultadas
+                        metricasConsultadas,
+                        alertasDoLote
                 );
 
             } else if (token == JsonToken.START_ARRAY) {
@@ -404,7 +509,8 @@ public class Main {
                         mac,
                         dao,
                         cacheLimites,
-                        metricasConsultadas
+                        metricasConsultadas,
+                        alertasDoLote
                 );
             }
 
@@ -431,7 +537,8 @@ public class Main {
             String mac,
             LimiteDao dao,
             Map<String, LimiteDao.Limite> cacheLimites,
-            Set<String> metricasConsultadas
+            Set<String> metricasConsultadas,
+            Map<String, Ocorrencia> alertasDoLote
     ) throws IOException {
 
         // Informações que caracterizam uma leitura de métrica.
@@ -485,7 +592,8 @@ public class Main {
                         mac,
                         dao,
                         cacheLimites,
-                        metricasConsultadas
+                        metricasConsultadas,
+                        alertasDoLote
                 );
 
                 // O objeto interno já foi percorrido.
@@ -504,7 +612,8 @@ public class Main {
                         mac,
                         dao,
                         cacheLimites,
-                        metricasConsultadas
+                        metricasConsultadas,
+                        alertasDoLote
                 );
 
                 continue;
@@ -576,7 +685,8 @@ public class Main {
                     recursoIdentificado,
                     dao,
                     cacheLimites,
-                    metricasConsultadas
+                    metricasConsultadas,
+                    alertasDoLote
             );
 
             total++;
@@ -600,7 +710,8 @@ public class Main {
             String recurso,
             LimiteDao dao,
             Map<String, LimiteDao.Limite> cacheLimites,
-            Set<String> metricasConsultadas
+            Set<String> metricasConsultadas,
+            Map<String, Ocorrencia> alertasDoLote
     ) throws IOException {
 
         // Consulta os limites apenas uma vez para cada métrica
@@ -635,8 +746,22 @@ public class Main {
         LimiteDao.Limite limite = cacheLimites.get(metrica);
 
         // Métrica sem limite configurado não gera alerta.
-        if (limite == null)
+        if (limite == null) {
+            System.out.printf(
+                    "[SEM LIMITE] MAC: %s | Métrica: %s%n",
+                    mac, metrica);
+
             return;
+        }
+
+        // Mostra que o Java encontrou a configuração da métrica
+        // no MySQL e está prestes a realizar a comparação.
+        System.out.printf(
+                "[COMPARANDO] Recurso: %s | Métrica: %s | " +
+                        "Valor: %.2f | Operador 1: %s | Operador 2: %s%n",
+                recurso, metrica, valor,
+                limite.operador(), limite.operador2()
+        );
 
         // Guarda a gravidade e a condição que gerou o alerta.
         String nivel;
@@ -696,19 +821,22 @@ public class Main {
 
         } else return;
 
-        // Mostra a condição exata que gerou o alerta.
-        System.out.printf(
-                "[%s] MAC: %s | Recurso: %s | Métrica: %s | " +
-                        "Origem: %s | Valor: %.2f | Operador: %s | Limite: %.2f%n",
-                nivel,
+        // Cria uma ocorrência com o resultado da comparação.
+        Ocorrencia ocorrencia = new Ocorrencia(
                 mac,
                 recurso,
                 metrica,
                 campoOrigem,
                 valor,
+                nivel,
                 operadorAplicado,
                 limiteAtingido
         );
+
+        // Encaminha para o agrupamento.
+        // Caso já exista uma ocorrência equivalente,
+        // será aplicada a prioridade de gravidade.
+        registrarOcorrencia(alertasDoLote, ocorrencia);
     }
 
     /**
@@ -728,6 +856,16 @@ public class Main {
             String montagem,
             String pid
     ) {
+
+        // Cada item de metricas representa uma captura
+        // da mesma máquina em um instante diferente.
+        //
+        // Não usamos metricas[0] ou metricas[1] como
+        // identificação do recurso, pois isso impediria
+        // agrupar as leituras da CPU total e outras métricas.
+        if (caminho.matches("^metricas\\[\\d+\\]$")) {
+            return "Máquina";
+        }
 
         // CPU lógica: identificada pelo índice.
         if (caminho.contains(".logicas.leituras[")
