@@ -15,6 +15,10 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import java.time.Instant;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -148,17 +152,64 @@ public class Main {
                 int arquivosProcessados = 0;
 
                 for (String chave : chavesCsv) {
+
                     try {
-                        totalLinhas += processarJson(
-                                s3Client, bucketName, chave, dao, jira, jaAlertados);
+
+                        // 1. Verifica se já existe um .ok no S3.
+                        // Se existir, o arquivo não precisa ser lido novamente.
+                        if (loteJaProcessado(s3Client, bucketName, chave)) {
+
+                            System.out.println(
+                                    "[IGNORADO] Arquivo já processado: " + chave
+                            );
+
+                            continue;
+                        }
+
+                        // 2. Se não existe .ok, processa o JSON.
+                        // Isso inclui a leitura das métricas,
+                        // consulta ao MySQL e comparação com os limites.
+                        int leituras = processarJson(
+                                s3Client,
+                                bucketName,
+                                chave,
+                                dao,
+                                jira,
+                                jaAlertados
+                        );
+
+                        // 3. O método terminou sem lançar exceção.
+                        // Atualiza as estatísticas da execução.
+                        totalLinhas += leituras;
                         arquivosProcessados++;
+
+                        // 4. Registra no S3 que o JSON foi processado.
+                        // Por enquanto, usamos o prefixo de testes.
+                        marcarLoteProcessado(
+                                s3Client,
+                                bucketName,
+                                chave
+                        );
+
+                        System.out.println(
+                                "[SUCESSO] Arquivo processado: " + chave
+                        );
+
                     } catch (S3Exception e) {
-                        String mensagem = e.awsErrorDetails() == null
-                                ? e.getMessage()
-                                : e.awsErrorDetails().errorMessage();
-                        System.err.printf("Erro ao acessar o arquivo S3 '%s': %s%n", chave, mensagem);
+
+                        // Problemas no S3 não geram marcador.
+                        // O arquivo poderá ser reprocessado.
+                        System.err.println(
+                                "[ERRO S3] " + chave + ": " + e.getMessage()
+                        );
+
                     } catch (IOException e) {
-                        System.err.printf("Erro ao ler o JSON '%s': %s%n", chave, e.getMessage());
+
+                        // Falhas na leitura ou comparação também
+                        // impedem a criação do marcador.
+                        System.err.println(
+                                "[ERRO JSON] " + chave + ": " + e.getMessage()
+                        );
                     }
                 }
 
@@ -214,7 +265,9 @@ public class Main {
             for (S3Object objeto : pagina.contents()) {
                 String chave = objeto.key();
 
-                if (chave != null && chave.toLowerCase(Locale.ROOT).endsWith(".json")) {
+                // Busca apenas arquivos de captura.
+                // Outros arquivos JSON não entram no processamento.
+                if (chave != null && chave.endsWith("/capturas.json")) {
                     chaves.add(chave);
                 }
             }
@@ -411,6 +464,16 @@ public class Main {
 
                 // Futuramente:
                 // criarTicket(jira, ...);
+        }
+
+        // Confirma que o documento possui seus
+        // identificadores obrigatórios.
+        if (mac == null || mac.isBlank()
+                || loteId == null || loteId.isBlank()) {
+
+            throw new IOException(
+                    "JSON sem MAC ou lote_id válido: " + chave
+            );
         }
 
         return totalLeituras;
@@ -932,6 +995,138 @@ public class Main {
                 yield false;
             }
         };
+    }
+
+    /**
+     * Monta a chave S3 do arquivo .ok correspondente
+     * a um arquivo de captura.
+     *
+     * Exemplo:
+     * client/lotes/maquina=01/lote=abc/capturas.json
+     *
+     * Resultado:
+     * client/controle/processados/maquina=01/lote=abc/capturas.json.ok
+     */
+    private static String chaveMarcador(String chave) {
+        // Prefixo onde o Python envia os arquivos JSON.
+        String prefixoCapturas = Env.get(
+                "S3_PREFIX", "client/lotes/"
+        ).trim();
+
+        // Prefixo onde o Java registra os processamentos.
+        String prefixoProcessados = Env.get(
+                "S3_PROCESSADOS_PREFIX",
+                "client/controle/testes-processados/"
+        ).trim();
+
+        // Padroniza os prefixos para evitar erros
+        // ao concatenar os caminhos.
+        if (!prefixoCapturas.endsWith("/"))
+            prefixoCapturas += "/";
+
+        if (!prefixoProcessados.endsWith("/"))
+            prefixoProcessados += "/";
+
+        // Impede gerar marcadores para arquivos que
+        // não pertençam ao diretório esperado.
+        if (!chave.startsWith(prefixoCapturas)
+                || !chave.endsWith("/capturas.json")) {
+
+            throw new IllegalArgumentException(
+                    "Chave de captura inválida: " + chave
+            );
+        }
+
+        // Remove o prefixo original e mantém
+        // maquina, data, lote e nome do arquivo.
+        String caminhoRelativo =
+                chave.substring(prefixoCapturas.length());
+
+        return prefixoProcessados + caminhoRelativo + ".ok";
+    }
+
+    /**
+     * Verifica se o JSON já foi processado anteriormente.
+     *
+     * Utiliza headObject(), que consulta o objeto no S3
+     * sem precisar baixar seu conteúdo.
+     *
+     * Retorna:
+     * true  -> marcador encontrado
+     * false -> marcador não existe
+     *
+     * Erros de permissão ou de serviço são propagados.
+     */
+    private static boolean loteJaProcessado(
+            S3Client s3,
+            String bucket,
+            String chave
+    ) {
+
+        // Descobre o caminho do .ok correspondente.
+        String marcador = chaveMarcador(chave);
+
+        HeadObjectRequest request = HeadObjectRequest.builder()
+                .bucket(bucket)
+                .key(marcador)
+                .build();
+
+        try {
+
+            // Se a chamada funcionar, o objeto existe.
+            s3.headObject(request);
+
+            return true;
+
+        } catch (S3Exception e) {
+
+            // 404 indica que o marcador não foi encontrado.
+            if (e.statusCode() == 404)
+                return false;
+
+            // Não devemos tratar erros 403, 500 etc.
+            // como se o arquivo ainda não existisse.
+            throw e;
+        }
+    }
+
+    /**
+     * Cria o arquivo .ok no S3, registrando que
+     * determinada captura foi processada com sucesso.
+     *
+     * Deve ser executado somente depois de todas
+     * as etapas obrigatórias do processamento.
+     */
+    private static void marcarLoteProcessado(
+            S3Client s3,
+            String bucket,
+            String chave
+    ) {
+
+        String marcador = chaveMarcador(chave);
+
+        // Informações simples para auditoria.
+        String conteudo = "STATUS=PROCESSADO\n"
+                + "ORIGEM=" + chave + "\n"
+                + "DATA=" + Instant.now();
+
+        // Requisição para criar o marcador no bucket.
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(marcador)
+                .contentType("text/plain")
+                .build();
+
+        // Envia o conteúdo como texto para o S3.
+        // Se a operação falhar, lança exceção.
+        s3.putObject(
+                request,
+                RequestBody.fromString(conteudo)
+        );
+
+        System.out.println(
+                "Marcador criado com sucesso: " + marcador
+        );
     }
 
     private static void criarTicket(Jira jira, String resumo) {
