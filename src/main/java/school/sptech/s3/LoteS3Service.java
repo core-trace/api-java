@@ -10,8 +10,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import static school.sptech.Main.chaveMarcador;
-
 public class LoteS3Service {
 
     private final S3Client s3;
@@ -133,5 +131,52 @@ public class LoteS3Service {
                 "Marcador criado com sucesso: " + marcador
         );
     }
-    // chaveMarcador() fica privado nesta classe.
+
+    /**
+     * Monta a chave S3 do arquivo .ok correspondente
+     * a um arquivo de captura.
+     *
+     * Exemplo:
+     * client/lotes/maquina=01/lote=abc/capturas.json
+     *
+     * Resultado:
+     * client/controle/processados/maquina=01/lote=abc/capturas.json.ok
+     */
+    private static String chaveMarcador(String chave) {
+        // Prefixo onde o Python envia os arquivos JSON.
+        String prefixoCapturas = Env.get(
+                "S3_PREFIX", "client/lotes/"
+        ).trim();
+
+        // Prefixo onde o Java registra os processamentos.
+        String prefixoProcessados = Env.get(
+                "S3_PROCESSADOS_PREFIX",
+                "client/controle/testes-processados/"
+        ).trim();
+
+        // Padroniza os prefixos para evitar erros
+        // ao concatenar os caminhos.
+        if (!prefixoCapturas.endsWith("/"))
+            prefixoCapturas += "/";
+
+        if (!prefixoProcessados.endsWith("/"))
+            prefixoProcessados += "/";
+
+        // Impede gerar marcadores para arquivos que
+        // não pertençam ao diretório esperado.
+        if (!chave.startsWith(prefixoCapturas)
+                || !chave.endsWith("/capturas.json")) {
+
+            throw new IllegalArgumentException(
+                    "Chave de captura inválida: " + chave
+            );
+        }
+
+        // Remove o prefixo original e mantém
+        // maquina, data, lote e nome do arquivo.
+        String caminhoRelativo =
+                chave.substring(prefixoCapturas.length());
+
+        return prefixoProcessados + caminhoRelativo + ".ok";
+    }
 }
