@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark light" />
+<meta name="description" content="Documentação técnica do CoreTrace: classes Java, métricas, S3, MySQL, Jira, cenários práticos e implantação." />
+<title>CoreTrace • Documentação técnica Java</title>
+<style>
+:root{--bg:#080c14;--panel:#101724;--panel2:#141e2e;--edge:#273347;--text:#e9eef7;--muted:#9aabc2;--accent:#72e4c5;--accent2:#8caaff;--warn:#f3cb86;--radius:15px;--sidebar:310px;font-synthesis:none}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:26px}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.68;font-size:15px}a{color:var(--accent2);text-decoration:none}a:hover{text-decoration:underline}a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.page{min-height:100vh;display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr)}.sidebar{background:linear-gradient(175deg,#101b2c,#0d1422 42%,#0a101d);border-right:1px solid var(--edge);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow:hidden}.brand{padding:25px 24px 18px;border-bottom:1px solid var(--edge)}.brand-logo{display:flex;align-items:center;gap:13px}.brand-mark{display:grid;place-items:center;background:linear-gradient(140deg,#2a968e,#466fda);color:#fff;border-radius:11px;width:44px;height:44px;font-size:21px;font-weight:800;box-shadow:0 7px 26px #083a4180}.brand-name{font-size:17px;font-weight:800;letter-spacing:-.4px}.brand-sub{color:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase}.searchwrap{padding:18px 19px 11px}.search{width:100%;border:1px solid #344357;border-radius:10px;background:#111d2d;color:var(--text);padding:11px 12px;font:inherit;font-size:13px}.search::placeholder{color:#7d90a9}.nav{overflow:auto;flex:1;padding:9px 12px 25px;scrollbar-width:thin}.nav a{display:block;padding:8px 13px;border-radius:9px;color:#a9bdd4;text-decoration:none;line-height:1.35;transition:.15s ease;overflow-wrap:anywhere}.nav a:hover{background:#1b2c3f;color:#fff}.nav a.active{background:#1c3544;color:var(--accent);font-weight:650}.nav-l2{font-size:13px;font-weight:600;margin-top:5px}.nav-l3{font-size:12px;margin-left:16px;padding-left:12px!important;border-left:1px solid #32425c;border-radius:0 8px 8px 0!important}.nav-dot{display:inline-block;border:2px solid var(--accent2);width:7px;height:7px;border-radius:100%;margin-right:9px;vertical-align:2px}.sidefoot{font-size:11px;color:#8195af;border-top:1px solid var(--edge);padding:14px 24px}.main{min-width:0}.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px clamp(20px,5vw,72px);border-bottom:1px solid var(--edge);font-size:12px;color:var(--muted)}.topbar .chip{border:1px solid #2d5264;color:var(--accent);background:#10313b;padding:5px 9px;border-radius:99px;font-weight:700;letter-spacing:.03em}.topbar .right{display:flex;gap:17px;align-items:center}.topbar a{color:#c5d3e6}main.article{max-width:1120px;padding:49px clamp(20px,5vw,76px) 110px;margin:0 auto}.intro{padding-bottom:32px;border-bottom:1px solid var(--edge);margin-bottom:35px}h1{font-size:clamp(36px,5vw,58px);line-height:1.1;letter-spacing:-2px;margin:0 0 24px;color:#fff}h1:before{content:'GUIA DO PROJETO';display:block;color:var(--accent);font-size:12px;letter-spacing:.19em;font-weight:750;margin-bottom:18px}h2{font-size:clamp(23px,2.7vw,32px);line-height:1.28;letter-spacing:-.6px;margin:64px 0 18px;padding-top:7px;color:#fff;border-top:1px solid var(--edge)}h3{font-size:22px;line-height:1.35;letter-spacing:-.25px;margin:39px 0 16px;color:#f4f7ff}h4{font-size:17px;margin:27px 0 11px}h2:first-of-type{border-top:0}.hash{font-size:.62em;color:#4a6178!important;display:inline-block;margin-left:-23px;margin-right:9px;opacity:0;vertical-align:3px}h2:hover .hash,h3:hover .hash,.hash:focus-visible{opacity:1}p{margin:12px 0 18px}strong{color:#f4f8ff}blockquote{border-left:3px solid var(--accent);background:#111f2b;padding:15px 22px;margin:22px 0 26px;border-radius:0 11px 11px 0;color:#c5d7e9}blockquote p{margin:0}ul,ol{padding-left:24px}li{padding-left:4px;margin:7px 0}li::marker{color:var(--accent2)}hr{border:0;border-top:1px solid var(--edge);margin:42px 0}code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:.9em}p code,li code,td code{padding:2px 6px;border-radius:5px;background:#202e41;color:#98eacc;overflow-wrap:anywhere}.codeblock{margin:22px 0 28px;background:#0e1420;border:1px solid #2a394b;border-radius:12px;overflow:hidden;box-shadow:0 9px 25px #00000012}.codehead{display:flex;align-items:center;justify-content:space-between;background:#151f2d;border-bottom:1px solid #283548;padding:7px 12px}.code-lang{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#8faec5}.copy{cursor:pointer;border:1px solid #314458;color:#becfdf;background:#1b2a3a;padding:5px 11px;font-size:11px;border-radius:6px}.copy:hover{background:#244459}pre{white-space:pre;overflow:auto;padding:18px 20px;font-size:12.7px;line-height:1.65;margin:0;tab-size:2}pre code{font-size:inherit}.table-container{width:100%;overflow-x:auto;margin:25px 0;border:1px solid #2c394e;border-radius:11px}table{border-collapse:collapse;width:100%;font-size:13.3px;min-width:510px}th{background:#1b293b;color:#d6e8f8;text-align:left;font-size:12px;letter-spacing:.02em;font-weight:750;padding:13px 15px}td{padding:12px 15px;border-top:1px solid #27354a;color:#c6d6e8;vertical-align:top}tr:nth-child(even) td{background:#111c2a}tr:hover td{background:#1a293b}.task-list-item{list-style:none;margin-left:-22px}.task-list-item input{accent-color:var(--accent);margin-right:8px}h3 code{color:var(--accent);font-size:.82em}a[href^="../src/"]{font-weight:600}.reading{height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));position:fixed;top:0;left:0;width:0;z-index:9;transition:width .05s}.menu{display:none}.footer{border-top:1px solid var(--edge);margin-top:45px;padding-top:20px;color:var(--muted);font-size:12px}.pillrow{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}.pillrow span{font-size:11px;color:#c6d9f0;padding:6px 10px;border:1px solid #335166;border-radius:8px;background:#122633}.print{border:1px solid #3c5367;background:#1b2837;color:#e1effd;border-radius:8px;padding:7px 11px;cursor:pointer}.print:hover{background:#284051}.found{display:none;color:var(--warn);padding:0 16px 10px;font-size:12px}.backtop{position:fixed;bottom:25px;right:25px;background:#1e3d4e;color:#d5fff7;border:1px solid #375e6c;border-radius:99px;padding:11px 15px;box-shadow:0 8px 35px #0006;font-weight:600;font-size:12px}.backtop:hover{text-decoration:none;background:#27546a}.sidebar.overlay{z-index:7}
+.highlight .c,.highlight .c1,.highlight .cm{color:#758ba2;font-style:italic}.highlight .s,.highlight .s2,.highlight .s1{color:#c1e6a2}.highlight .k,.highlight .kd,.highlight .kn{color:#95bcff}.highlight .n,.highlight .na{color:#ecedf5}.highlight .nf,.highlight .nc{color:#80e4da}.highlight .mi,.highlight .mf{color:#f9c994}.highlight .o,.highlight .p{color:#cfddf2}.highlight .nd{color:#c4a0ff}.highlight .err{background:transparent;color:#f3afaf}
+@media(max-width:1080px){:root{--sidebar:270px}.nav-l2{font-size:12px}main.article{padding-left:38px;padding-right:38px}}
+@media(max-width:850px){.page{display:block}.sidebar{position:fixed;left:0;width:min(330px,90vw);transform:translateX(-105%);transition:transform .18s;z-index:7;box-shadow:15px 0 40px #0007}.sidebar.show{transform:translateX(0)}.menu{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--edge);background:var(--panel);border-radius:8px;color:#fff;padding:7px 11px;cursor:pointer}.topbar{position:sticky;top:0;background:#0b121df5;z-index:5;padding:12px 20px}main.article{padding:32px 23px 95px}.hash{opacity:1;margin-left:0}.backtop{right:15px;bottom:15px}}
+@media print{.sidebar,.topbar,.backtop,.reading,.copy{display:none!important}.page{display:block}body{background:#fff;color:#1a2430;font-size:12px}main.article{max-width:100%;padding:0 10mm}h1,h2,h3,strong{color:#101923}a{color:#13507b}pre{white-space:pre-wrap}.codeblock{background:#f5f7fa}.codehead{background:#eff1f4}table{min-width:0}td{color:#1c2330}th{background:#edf2f7;color:#111}blockquote{color:#1b293b;background:#f5f9f8}h2{page-break-after:avoid}}
+</style>
+</head>
+<body>
+<div class="reading" id="readProgress"></div>
+<div class="page">
+<aside class="sidebar" id="sidebar" aria-label="Índice da documentação">
+<div class="brand"><div class="brand-logo"><div class="brand-mark">C</div><div><div class="brand-name">CoreTrace</div><div class="brand-sub">Java · Technical Docs</div></div></div></div>
+<div class="searchwrap"><input type="search" class="search" id="navSearch" aria-label="Buscar seção" placeholder="Buscar classe ou seção..." /></div><div class="found" id="emptySearch">Nenhuma seção encontrada.</div>
+<nav class="nav" id="nav"><a class="nav-l2" href="#1-visao-geral" data-search="1. visão geral"><span class="nav-dot"></span>1. Visão geral</a>
+<a class="nav-l3" href="#comportamentos-fundamentais" data-search="comportamentos fundamentais">Comportamentos fundamentais</a>
+<a class="nav-l2" href="#2-estrutura-real-do-projeto" data-search="2. estrutura real do projeto"><span class="nav-dot"></span>2. Estrutura real do projeto</a>
+<a class="nav-l2" href="#3-um-ciclo-de-processamento-passo-a-passo" data-search="3. um ciclo de processamento, passo a passo"><span class="nav-dot"></span>3. Um ciclo de processamento, passo a passo</a>
+<a class="nav-l2" href="#4-contrato-de-entrada-e-exemplo-de-json" data-search="4. contrato de entrada e exemplo de json"><span class="nav-dot"></span>4. Contrato de entrada e exemplo de JSON</a>
+<a class="nav-l2" href="#5-referencia-completa-das-classes-e-metodos" data-search="5. referência completa das classes e métodos"><span class="nav-dot"></span>5. Referência completa das classes e métodos</a>
+<a class="nav-l3" href="#51-main-inicializacao-do-aplicativo" data-search="5.1 main — inicialização do aplicativo">5.1 Main — inicialização do aplicativo</a>
+<a class="nav-l3" href="#52-processamentoservice-orquestracao" data-search="5.2 processamentoservice — orquestração">5.2 ProcessamentoService — orquestração</a>
+<a class="nav-l3" href="#53-processadorjson-leitura-recursiva-classificacao-e-agrupamento" data-search="5.3 processadorjson — leitura recursiva, classificação e agrupamento">5.3 ProcessadorJson — leitura recursiva, classificação e agrupamento</a>
+<a class="nav-l3" href="#54-lotes3service-descoberta-e-marcador-dos-lotes" data-search="5.4 lotes3service — descoberta e marcador dos lotes">5.4 LoteS3Service — descoberta e marcador dos lotes</a>
+<a class="nav-l3" href="#55-limitedao-consulta-jdbc-ao-mysql" data-search="5.5 limitedao — consulta jdbc ao mysql">5.5 LimiteDao — consulta JDBC ao MySQL</a>
+<a class="nav-l3" href="#56-mysqlprovider-conexao-ao-banco" data-search="5.6 mysqlprovider — conexão ao banco">5.6 MySqlProvider — conexão ao banco</a>
+<a class="nav-l3" href="#57-s3provider-cliente-aws" data-search="5.7 s3provider — cliente aws">5.7 S3Provider — cliente AWS</a>
+<a class="nav-l3" href="#58-env-leitura-e-validacao-de-configuracao" data-search="5.8 env — leitura e validação de configuração">5.8 Env — leitura e validação de configuração</a>
+<a class="nav-l3" href="#59-chamadoservice-regras-de-negocio-do-jira" data-search="5.9 chamadoservice — regras de negócio do jira">5.9 ChamadoService — regras de negócio do Jira</a>
+<a class="nav-l3" href="#510-jira-cliente-rest-do-jira-cloud" data-search="5.10 jira — cliente rest do jira cloud">5.10 Jira — cliente REST do Jira Cloud</a>
+<a class="nav-l3" href="#511-schoolsptechmodelocorrencia-record-de-modelo" data-search="5.11 school.sptech.model.ocorrencia — record de modelo">5.11 school.sptech.model.Ocorrencia — record de modelo</a>
+<a class="nav-l3" href="#512-projectdto-projeto-da-issue" data-search="5.12 projectdto — projeto da issue">5.12 ProjectDto — projeto da issue</a>
+<a class="nav-l3" href="#513-issuetypedto-tipo-da-issue" data-search="5.13 issuetypedto — tipo da issue">5.13 IssueTypeDto — tipo da issue</a>
+<a class="nav-l3" href="#514-issuefieldsdto-campos-da-issue" data-search="5.14 issuefieldsdto — campos da issue">5.14 IssueFieldsDto — campos da issue</a>
+<a class="nav-l3" href="#515-issuerequestdto-corpo-da-requisicao" data-search="5.15 issuerequestdto — corpo da requisição">5.15 IssueRequestDto — corpo da requisição</a>
+<a class="nav-l2" href="#6-cenarios-praticos-completos" data-search="6. cenários práticos completos"><span class="nav-dot"></span>6. Cenários práticos completos</a>
+<a class="nav-l3" href="#cenario-a-primeira-captura-acima-do-limite-de-atencao" data-search="cenário a — primeira captura acima do limite de atenção">Cenário A — primeira captura acima do limite de atenção</a>
+<a class="nav-l3" href="#cenario-b-mesmo-problema-evolui-para-critico-em-outro-lote" data-search="cenário b — mesmo problema evolui para crítico em outro lote">Cenário B — mesmo problema evolui para crítico em outro lote</a>
+<a class="nav-l3" href="#cenario-c-mesma-captura-processada-outra-vez" data-search="cenário c — mesma captura processada outra vez">Cenário C — mesma captura processada outra vez</a>
+<a class="nav-l3" href="#cenario-d-problema-normaliza-mas-o-chamado-continua-aberto" data-search="cenário d — problema normaliza, mas o chamado continua aberto">Cenário D — problema normaliza, mas o chamado continua aberto</a>
+<a class="nav-l3" href="#cenario-e-limite-inferior-e-superior-na-mesma-metrica" data-search="cenário e — limite inferior e superior na mesma métrica">Cenário E — limite inferior e superior na mesma métrica</a>
+<a class="nav-l3" href="#cenario-f-falha-do-jira-e-reprocessamento-posterior" data-search="cenário f — falha do jira e reprocessamento posterior">Cenário F — falha do Jira e reprocessamento posterior</a>
+<a class="nav-l2" href="#7-configuracao-e-execucao" data-search="7. configuração e execução"><span class="nav-dot"></span>7. Configuração e execução</a>
+<a class="nav-l3" href="#dependencias-e-build" data-search="dependências e build">Dependências e build</a>
+<a class="nav-l3" href="#variaveis-de-ambiente" data-search="variáveis de ambiente">Variáveis de ambiente</a>
+<a class="nav-l3" href="#permissoes-de-infraestrutura" data-search="permissões de infraestrutura">Permissões de infraestrutura</a>
+<a class="nav-l2" href="#8-operacao-logs-e-resolucao-de-problemas" data-search="8. operação, logs e resolução de problemas"><span class="nav-dot"></span>8. Operação, logs e resolução de problemas</a>
+<a class="nav-l2" href="#9-limitacoes-conhecidas-da-versao-documentada" data-search="9. limitações conhecidas da versão documentada"><span class="nav-dot"></span>9. Limitações conhecidas da versão documentada</a>
+<a class="nav-l2" href="#10-roteiro-recomendado-de-validacao" data-search="10. roteiro recomendado de validação"><span class="nav-dot"></span>10. Roteiro recomendado de validação</a>
+<a class="nav-l2" href="#11-glossario-e-caminhos-de-referencia" data-search="11. glossário e caminhos de referência"><span class="nav-dot"></span>11. Glossário e caminhos de referência</a></nav>
+<div class="sidefoot">Documentação baseada no código recebido · 15 classes Java</div>
+</aside>
+<div class="main">
+<header class="topbar"><button class="menu" id="menu" type="button" aria-expanded="false" aria-controls="sidebar">☰ &nbsp;Índice</button><div><span class="chip">JAVA 21</span> &nbsp; Guia técnico</div><div class="right"><a href="#2-estrutura-real-do-projeto">Estrutura</a><button class="print" type="button" onclick="window.print()">Imprimir</button></div></header>
+<main class="article"><div class="pillrow" aria-label="Tecnologias"><span>Amazon S3</span><span>Jackson Streaming</span><span>MySQL / JDBC</span><span>Jira Cloud</span><span>Maven</span></div><article id="content"><h1 id="coretrace-documentacao-tecnica-da-api-java"><a class="hash" href="#coretrace-documentacao-tecnica-da-api-java" aria-label="Link para esta seção">#</a>CoreTrace — documentação técnica da API Java</h1>
+<blockquote><p><strong>Referência do código:</strong> versão contida no arquivo <code>java.zip</code> fornecido para esta documentação. <strong>Escopo:</strong> o módulo Java de processamento de capturas JSON no Amazon S3, leitura de limites no MySQL e gestão de chamados no Jira Cloud. Este guia descreve o comportamento <strong>implementado</strong>, não funcionalidades hipotéticas. Os exemplos de MAC, métricas, limites e chamados são didáticos; não representam dados reais do ambiente.</p>
+</blockquote>
+<h2 id="1-visao-geral"><a class="hash" href="#1-visao-geral" aria-label="Link para esta seção">#</a>1. Visão geral</h2>
+<p>O módulo Java do <strong>CoreTrace</strong> automatiza a análise de capturas de infraestrutura e a abertura de chamados quando métricas ultrapassam limites associados ao perfil de um servidor. Ele executa um ciclo de verificação a cada cinco minutos <strong>após a conclusão do ciclo anterior</strong>, usando um agendador de uma única thread.</p>
+<div class="codeblock"><div class="codehead"><span class="code-lang">text</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code>Agente/ETL externo → Amazon S3 (capturas.json)
+                         │
+                         ▼
+                   LoteS3Service
+                encontra novos lotes
+                         │
+                         ▼
+                 ProcessamentoService
+                  abre JSON via stream
+                         │
+                         ▼
+                    ProcessadorJson ─────→ LimiteDao ─────→ MySQL
+                 extrai e avalia           consulta limites
+                         │
+                         ▼
+                    Ocorrências
+                  agrupadas por recurso
+                         │
+                         ▼
+                    ChamadoService ──────→ Jira (API REST)
+                  busca, cria ou escala
+                         │
+                         ▼
+                   LoteS3Service
+               grava marcador capturas.json.ok
+</code></pre></div>
+<p><strong>Responsabilidades:</strong> a captura e o envio do JSON não são implementados neste ZIP: são etapas externas consumidas pelo módulo Java. A aplicação Java não grava limites no MySQL; ela apenas os consulta. O encerramento dos chamados também não é automático.</p>
+<h3 id="comportamentos-fundamentais"><a class="hash" href="#comportamentos-fundamentais" aria-label="Link para esta seção">#</a>Comportamentos fundamentais</h3>
+<ul>
+<li><strong>Filtragem por servidor:</strong> o endereço MAC (<code>endereco_mac</code>) identifica o servidor que determina quais limites do MySQL consultar.</li>
+<li><strong>Filtragem por métrica:</strong> somente leituras com <code>status = &quot;ok&quot;</code>, identificador de métrica e valor numérico finito entram na avaliação.</li>
+<li><strong>Duas condições opcionais por métrica:</strong> cada configuração pode ter dois conjuntos de operadores e limites, por exemplo <code>&gt; 90</code> e <code>&lt; 10</code>.</li>
+<li><strong>Precedência:</strong> qualquer condição <strong>CRÍTICA</strong> satisfeita prevalece sobre uma condição de <strong>ATENÇÃO</strong>.</li>
+<li><strong>Agrupamento por lote:</strong> máquina + recurso + métrica + campo de origem identificam a ocorrência. Para a mesma chave, crítico prevalece; com o mesmo nível, mantém a última leitura percorrida.</li>
+<li><strong>Controle de reprocessamento:</strong> cada <code>capturas.json</code> concluído gera um objeto <code>.ok</code> no S3. O mesmo lote é ignorado em ciclos posteriores.</li>
+<li><strong>Controle de tickets:</strong> uma etiqueta estável permite buscar um chamado ainda não concluído no Jira; se houver escalada, o título recebe <code>[CRÍTICO]</code> e o ticket ganha a etiqueta <code>coretrace-critico</code>.</li>
+</ul>
+<h2 id="2-estrutura-real-do-projeto"><a class="hash" href="#2-estrutura-real-do-projeto" aria-label="Link para esta seção">#</a>2. Estrutura real do projeto</h2>
+<div class="codeblock"><div class="codehead"><span class="code-lang">text</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code>api-java/
+├── pom.xml
+├── CONFIGURACAO.md                  # arquivo legado que ainda descreve CSV
+└── src/main/java/school/sptech/
+    ├── Main.java                    # inicialização, agenda e record interno
+    ├── client/
+    │   ├── MySqlProvider.java       # conexões JDBC
+    │   └── S3Provider.java          # cliente AWS S3
+    ├── config/
+    │   ├── Env.java                 # .env e variáveis de ambiente
+    │   └── Jira.java                # cliente HTTP da API Jira
+    ├── docker/
+    │   └── LimiteDao.java           # consultas SQL de limites
+    ├── dto/
+    │   ├── IssueFieldsDto.java
+    │   ├── IssueRequestDto.java
+    │   ├── IssueTypeDto.java
+    │   └── ProjectDto.java
+    ├── model/
+    │   └── Ocorrencia.java          # record separado, não usado pelo fluxo atual
+    ├── s3/
+    │   └── LoteS3Service.java       # descoberta de lotes e marcadores .ok
+    └── service/
+        ├── ChamadoService.java      # decisões de tickets
+        ├── ProcessadorJson.java     # leitura aninhada, limites e agrupamento
+        └── ProcessamentoService.java # orquestração dos lotes
+</code></pre></div>
+<p><strong>Observação sobre <code>Ocorrencia</code>:</strong> o ZIP contém dois records com o mesmo nome: <code>school.sptech.Main.Ocorrencia</code> e <code>school.sptech.model.Ocorrencia</code>. <code>ProcessadorJson</code>, <code>ProcessamentoService</code> e <code>ChamadoService</code> importam <strong><code>Main.Ocorrencia</code></strong>. Portanto, o record do pacote <code>model</code> existe no repositório, mas <strong>não é o tipo usado por esse fluxo</strong>.</p>
+<h2 id="3-um-ciclo-de-processamento-passo-a-passo"><a class="hash" href="#3-um-ciclo-de-processamento-passo-a-passo" aria-label="Link para esta seção">#</a>3. Um ciclo de processamento, passo a passo</h2>
+<ol>
+<li><code>Main.main()</code> cria um <code>ScheduledExecutorService</code> com uma thread e agenda a execução inicial imediata; cada nova execução começa cinco minutos depois de a anterior terminar.</li>
+<li><code>ProcessamentoService.executarProcessamento()</code> valida configurações, cria <code>LimiteDao</code>, <code>Jira</code> e <code>S3Client</code> e instancia <code>LoteS3Service</code>.</li>
+<li><code>LoteS3Service.obterChavesCaptura()</code> lista as chaves terminadas em <code>/capturas.json</code> dentro de <code>S3_PREFIX</code>, ou usa somente <code>S3_KEY</code> quando preenchido; ordena as chaves.</li>
+<li>Para cada chave, <code>loteJaProcessado()</code> procura o correspondente <code>.ok</code> usando <code>headObject()</code>. Encontrou? O lote é ignorado.</li>
+<li>Caso não haja <code>.ok</code>, <code>processarJson()</code> faz <code>getObject()</code> no S3 e passa um <code>InputStream</code> ao <code>JsonParser</code>. Não materializa todo o JSON em uma única árvore na memória.</li>
+<li>O objeto raiz fornece <code>endereco_mac</code> e <code>lote_id</code>. Os arrays <code>metricas</code>, <code>processos</code> e <code>containers</code> são encaminhados a <code>ProcessadorJson.processarRegistros()</code>.</li>
+<li>O processador percorre objetos e arrays recursivamente, identifica o recurso e seleciona leituras numéricas válidas. Para cada métrica, consulta <code>LimiteDao.buscarPorMac()</code> no máximo uma vez <strong>por arquivo</strong> graças ao cache local.</li>
+<li>O processador decide entre <code>ATENCAO</code>, <code>CRITICO</code> e nenhuma ocorrência; guarda os alertas agrupados em um <code>LinkedHashMap</code>.</li>
+<li>Depois da leitura, <code>ChamadoService.criarTicket()</code> consulta o Jira por etiqueta. Reutiliza um chamado aberto, escala para crítico quando necessário ou cria um novo.</li>
+<li><strong>Somente se <code>processarJson()</code> terminar com sucesso</strong>, <code>marcarLoteProcessado()</code> cria o objeto <code>.ok</code>. Falhas tratadas como <code>IOException</code> ou <code>S3Exception</code> impedem o marcador daquele lote.</li>
+</ol>
+<blockquote><p><strong>Importante:</strong> o <code>.ok</code> é gravado por arquivo, não por leitura individual. Uma falha após a criação de alguns tickets, mas antes do <code>.ok</code>, permite o reprocessamento do lote. A busca no Jira reduz esse problema, porém não oferece uma transação distribuída nem proteção absoluta contra corridas.</p>
+</blockquote>
+<h2 id="4-contrato-de-entrada-e-exemplo-de-json"><a class="hash" href="#4-contrato-de-entrada-e-exemplo-de-json" aria-label="Link para esta seção">#</a>4. Contrato de entrada e exemplo de JSON</h2>
+<p>O parser espera um <strong>objeto JSON na raiz</strong>. Entre os campos conhecidos estão <code>endereco_mac</code>, <code>lote_id</code>, <code>metricas</code>, <code>processos</code> e <code>containers</code>. Outros campos são ignorados com <code>skipChildren()</code>.</p>
+<p><strong>Exemplo didático mínimo compatível com o percurso implementado:</strong></p>
+<div class="codeblock"><div class="codehead"><span class="code-lang">json</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;endereco_mac&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;02:00:00:00:00:01&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;lote_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lote-exemplo-001&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricas&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;cpu&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;logicas&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;leituras&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">            </span><span class="p">{</span>
+<span class="w">              </span><span class="nt">&quot;indice&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">              </span><span class="nt">&quot;uso&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">&quot;metrica&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cpu_percent_percpu&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;campo_origem&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cpu_percent_percpu&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;valor&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">80.0</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span>
+<span class="w">              </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">          </span><span class="p">]</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;processos&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;containers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>O percurso reconhece <code>metricas[0].cpu.logicas.leituras[0]</code>, encontra <code>indice = 1</code> e usa <strong><code>CPU lógica 1</code></strong> como recurso associado à leitura <code>cpu_percent_percpu = 80</code>. Para esse exemplo produzir um alerta, a métrica precisa estar configurada no MySQL para o MAC informado e o valor precisa ultrapassar seu limite.</p>
+<p><strong>Regras efetivamente aplicadas:</strong></p>
+<div class="table-container"><table>
+<thead>
+<tr>
+  <th>Situação</th>
+  <th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>status</code> igual a <code>&quot;ok&quot;</code>, <code>metrica</code> não vazia, <code>valor</code> numérico finito</td>
+  <td>Leitura contabilizada e enviada à avaliação</td>
+</tr>
+<tr>
+  <td><code>status</code> diferente de <code>&quot;ok&quot;</code></td>
+  <td>Ignorada como leitura válida</td>
+</tr>
+<tr>
+  <td><code>valor</code> não numérico, ausente, <code>NaN</code> ou infinito</td>
+  <td>Ignorado</td>
+</tr>
+<tr>
+  <td>Métrica sem configuração no perfil do servidor</td>
+  <td>Conta como leitura válida, mas <strong>não gera alerta</strong></td>
+</tr>
+<tr>
+  <td><code>processos</code> ou <code>containers</code> sem objetos com <code>metrica</code> e <code>status = &quot;ok&quot;</code></td>
+  <td>Nenhuma leitura válida desses objetos</td>
+</tr>
+<tr>
+  <td>Array de métricas antes de <code>endereco_mac</code> na raiz</td>
+  <td><code>IOException(&quot;MAC não identificado&quot;)</code></td>
+</tr>
+<tr>
+  <td><code>lote_id</code> ausente</td>
+  <td>Aparece <code>null</code> no log; <strong>não há validação final desse campo</strong> na versão enviada</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Atenção à ordem dos campos:</strong> embora JSON, em geral, não dependa da ordem de propriedades, este código consulta alguns identificadores do objeto pai <strong>antes</strong> de descer ao objeto filho. Se <code>indice</code>, <code>nome</code> ou <code>dispositivo</code> vierem depois do campo aninhado, o recurso herdado pode não ser o esperado. O exemplo coloca <code>indice</code> antes de <code>uso</code> deliberadamente.</p>
+<h2 id="5-referencia-completa-das-classes-e-metodos"><a class="hash" href="#5-referencia-completa-das-classes-e-metodos" aria-label="Link para esta seção">#</a>5. Referência completa das classes e métodos</h2>
+<p>As assinaturas abaixo refletem as classes Java do ZIP. Quando um método é <code>private</code>, ele é detalhado para facilitar a manutenção, mas não é uma API pública. As ligações “ver código” usam caminhos relativos, prontos para funcionar quando este guia estiver em <code>docs/</code> no próprio repositório.</p>
+<h3 id="51-main-inicializacao-do-aplicativo"><a class="hash" href="#51-main-inicializacao-do-aplicativo" aria-label="Link para esta seção">#</a>5.1 <code>Main</code> — inicialização do aplicativo</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/Main.java"><code>Main.java</code></a><br />
+<strong>Papel:</strong> ponto de entrada do JAR, agendamento e definição de <code>Main.Ocorrencia</code>.</p>
+<p><strong><code>public static void main(String[] args)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> argumentos de linha de comando (não utilizados).</li>
+<li><strong>Saída:</strong> nenhuma; mantém o agendador ativo.</li>
+<li><strong>Funcionamento:</strong> cria <code>Executors.newSingleThreadScheduledExecutor()</code>, agenda com <code>scheduleWithFixedDelay(..., 0, 5, MINUTES)</code>, instancia um <code>ProcessamentoService</code> a cada ciclo e chama <code>executarProcessamento()</code>.</li>
+<li><strong>Exemplo:</strong> se o ciclo iniciar às 10:00 e terminar às 10:02, a próxima execução começa por volta de <strong>10:07</strong>, não necessariamente 10:05.</li>
+<li><strong>Erro:</strong> imprime mensagem em <code>System.out</code>; o próximo ciclo continua agendado.</li>
+</ul>
+<p><strong><code>public record Main.Ocorrencia(...)</code></strong></p>
+<p>Armazena <code>mac</code>, <code>recurso</code>, <code>metrica</code>, <code>campoOrigem</code>, <code>valor</code>, <code>nivel</code>, <code>operador</code> e <code>limite</code>. Não é um ticket; representa a condição detectada. Exemplo conceitual:</p>
+<div class="codeblock"><div class="codehead"><span class="code-lang">java</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code><span class="k">new</span><span class="w"> </span><span class="n">Main</span><span class="p">.</span><span class="na">Ocorrencia</span><span class="p">(</span>
+<span class="w">    </span><span class="s">&quot;02:00:00:00:00:01&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;CPU lógica 1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cpu_percent_percpu&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s">&quot;cpu_percent_percpu&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">80.0</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;ATENCAO&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;&gt;&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">70.0</span>
+<span class="p">);</span>
+</code></pre></div>
+<h3 id="52-processamentoservice-orquestracao"><a class="hash" href="#52-processamentoservice-orquestracao" aria-label="Link para esta seção">#</a>5.2 <code>ProcessamentoService</code> — orquestração</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/service/ProcessamentoService.java"><code>ProcessamentoService.java</code></a><br />
+<strong>Papel:</strong> controlar o ciclo, criar dependências, abrir cada JSON e entregar ocorrências ao Jira.</p>
+<p><strong><code>public void executarProcessamento()</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> nenhuma; lê configurações via <code>Env</code>.</li>
+<li><strong>Funcionamento:</strong> valida configurações; cria <code>LimiteDao(new MySqlProvider())</code> e <code>Jira</code>; abre um <code>S3Client</code> no <code>try-with-resources</code>; lista capturas; ignora lotes com <code>.ok</code>; chama <code>processarJson()</code>; cria <code>.ok</code> em caso de sucesso; contabiliza arquivos e leituras.</li>
+<li><strong>Exemplo:</strong> com três chaves no S3, duas já marcadas e uma inédita, somente a inédita é enviada ao parser. Os dois <code>.ok</code> anteriores permanecem intactos.</li>
+<li><strong>Falhas:</strong> captura <code>S3Exception</code> e <code>IOException</code> por lote; configurações ausentes geram <code>IllegalStateException</code> capturada externamente. O método <strong>não devolve</strong> um indicador agregado de sucesso ou falha; imprime informações no console.</li>
+</ul>
+<p><strong><code>private void validarConfiguracao()</code></strong></p>
+<ul>
+<li><strong>Entrada/saída:</strong> nenhuma; lança <code>IllegalStateException</code> quando falta uma variável obrigatória.</li>
+<li><strong>Variáveis verificadas:</strong> <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code>, <code>S3_BUCKET</code>, <code>JIRA_BASE_URL</code>, <code>JIRA_EMAIL</code>, <code>JIRA_API_TOKEN</code> e <code>JIRA_PROJECT_KEY</code>.</li>
+<li><strong>Exemplo:</strong> ausência de <code>JIRA_PROJECT_KEY</code> interrompe a execução antes da listagem do S3.</li>
+<li><strong>Nota:</strong> <code>S3_KEY</code> e <code>S3_PREFIX</code> não são obrigatórias neste método.</li>
+</ul>
+<p><strong><code>private static Jira criarJira()</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> lê <code>JIRA_BASE_URL</code>, <code>JIRA_EMAIL</code>, <code>JIRA_API_TOKEN</code>.</li>
+<li><strong>Saída:</strong> instância de <code>Jira</code> autenticada por cabeçalho Basic.</li>
+<li><strong>Exemplo:</strong> remove barras <code>/</code> finais da URL antes de construir o cliente, evitando <code>//rest/api/3/...</code>.</li>
+</ul>
+<p><strong><code>private static int processarJson(S3Client s3, String bucket, String chave, LimiteDao dao, Jira jira, Set&lt;String&gt; jaAlertados)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> cliente S3, bucket, chave do objeto, DAO, cliente Jira e um conjunto <code>jaAlertados</code>.</li>
+<li><strong>Saída:</strong> número de leituras válidas percorridas nesse arquivo (<code>int</code>).</li>
+<li><strong>Funcionamento:</strong> usa <code>GetObjectRequest</code>; abre <code>InputStream</code> + <code>JsonFactory</code>/<code>JsonParser</code>; exige objeto na raiz; extrai <code>endereco_mac</code> e <code>lote_id</code>; encaminha os arrays ao <code>ProcessadorJson</code>; após fechar o fluxo, imprime total e agrupamentos, chama <code>ChamadoService.criarTicket()</code> para cada ocorrência.</li>
+<li><strong>Exemplo:</strong> 81 leituras numéricas válidas podem resultar em apenas 1 ocorrência agrupada: são medidas diferentes ou capturas sucessivas, mas só o grupo que atingiu limite vira ticket.</li>
+<li><strong>Detalhe:</strong> <code>jaAlertados</code> está presente na assinatura e é criado no ciclo, mas <strong>não é utilizado</strong> no corpo desse método na versão analisada. A deduplicação efetiva ocorre pelo mapa de ocorrências, etiquetas do Jira e <code>.ok</code> do S3.</li>
+<li><strong>Falhas:</strong> IO de leitura, erro SQL encapsulado como IO e erro HTTP encapsulado como IO podem impedir o <code>.ok</code> correspondente.</li>
+</ul>
+<h3 id="53-processadorjson-leitura-recursiva-classificacao-e-agrupamento"><a class="hash" href="#53-processadorjson-leitura-recursiva-classificacao-e-agrupamento" aria-label="Link para esta seção">#</a>5.3 <code>ProcessadorJson</code> — leitura recursiva, classificação e agrupamento</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/service/ProcessadorJson.java"><code>ProcessadorJson.java</code></a><br />
+<strong>Papel:</strong> percorrer a estrutura do JSON e transformar leituras de métricas em ocorrências classificadas.</p>
+<p><strong><code>public static int processarRegistros(JsonParser parser, String tipo, String mac, LimiteDao dao, Map cacheLimites, Set metricasConsultadas, Map alertasDoLote)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> parser posicionado em <code>START_ARRAY</code>; tipo (<code>metricas</code>, <code>processos</code>, <code>containers</code>); MAC; DAO; coleções do lote.</li>
+<li><strong>Saída:</strong> contador de leituras válidas.</li>
+<li><strong>Funcionamento:</strong> inicia <code>percorrerArray(parser, tipo, null, ...)</code>.</li>
+<li><strong>Exemplo:</strong> ao receber <code>tipo = &quot;metricas&quot;</code>, inicia o percurso com caminhos como <code>metricas[0]</code>.</li>
+</ul>
+<p><strong><code>private static int percorrerArray(...)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> caminho atual, recurso herdado e contexto do processamento.</li>
+<li><strong>Saída:</strong> soma de leituras válidas nos itens visitados.</li>
+<li><strong>Funcionamento:</strong> percorre até <code>END_ARRAY</code>, incrementa <code>indice</code>, chama <code>percorrerObjeto()</code> nos objetos e a si próprio nos arrays aninhados.</li>
+<li><strong>Exemplo:</strong> um array com dois objetos produz os caminhos <code>metricas[0]</code> e <code>metricas[1]</code>. Elementos escalares do array não são comparados como métricas.</li>
+</ul>
+<p><strong><code>private static int percorrerObjeto(...)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> objeto JSON atual, caminho, recurso herdado, MAC, DAO e mapas do lote.</li>
+<li><strong>Saída:</strong> número de leituras válidas encontradas nesse objeto e nos descendentes.</li>
+<li><strong>Funcionamento:</strong> lê campos <code>metrica</code>, <code>campo_origem</code>, <code>status</code>, <code>valor</code>, <code>indice</code>, <code>nome</code>, <code>dispositivo</code>, <code>montagem</code> e <code>pid</code>; percorre objetos e arrays filhos; ao terminar o objeto, verifica <code>status</code>, <code>metrica</code> e valor numérico finito; se válidos, chama <code>avaliarMetrica()</code>.</li>
+<li><strong>Exemplo:</strong> <code>{ &quot;metrica&quot;: &quot;ram_percent&quot;, &quot;valor&quot;: 93, &quot;status&quot;: &quot;ok&quot; }</code> é elegível à avaliação; <code>{ &quot;valor&quot;: &quot;93&quot; }</code> não é, porque o valor é string e não um token numérico.</li>
+<li><strong>Nota:</strong> a leitura é recursiva; não é uma conversão integral do JSON para um POJO.</li>
+</ul>
+<p><strong><code>private static String identificarRecurso(...)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> caminho JSON, recurso herdado e identificadores (<code>indice</code>, <code>nome</code>, <code>dispositivo</code>, <code>montagem</code>, <code>pid</code>).</li>
+<li><strong>Saída:</strong> descrição textual do recurso.</li>
+<li><strong>Regras e exemplos:</strong></li>
+</ul>
+<div class="table-container"><table>
+<thead>
+<tr>
+  <th>Caminho / dados</th>
+  <th>Recurso produzido</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>metricas[0]</code></td>
+  <td><code>Máquina</code></td>
+</tr>
+<tr>
+  <td><code>.logicas.leituras[</code> com <code>indice = 1</code></td>
+  <td><code>CPU lógica 1</code></td>
+</tr>
+<tr>
+  <td><code>.disco.volumes[</code> com <code>dispositivo = /dev/sda1</code>, <code>montagem = /</code></td>
+  <td><code>Volume /dev/sda1 (/)</code></td>
+</tr>
+<tr>
+  <td><code>.disco.io[</code> com <code>dispositivo = sda</code></td>
+  <td><code>Disco sda</code></td>
+</tr>
+<tr>
+  <td><code>.rede.interfaces[</code> com <code>nome = eth0</code></td>
+  <td><code>Interface eth0</code></td>
+</tr>
+<tr>
+  <td><code>processos[0]</code> com <code>nome = java</code>, <code>pid = 123</code></td>
+  <td><code>Processo java (PID 123)</code></td>
+</tr>
+<tr>
+  <td><code>containers[0]</code> com <code>nome = mysql</code></td>
+  <td><code>Contêiner mysql</code></td>
+</tr>
+<tr>
+  <td>Sem identificador próprio</td>
+  <td>Recurso herdado; se ausente, o próprio caminho</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong><code>private static void avaliarMetrica(...)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> MAC, nome da métrica, campo de origem, valor, recurso, DAO e caches do lote.</li>
+<li><strong>Saída:</strong> nenhuma diretamente; acrescenta ou substitui uma ocorrência no mapa quando um limite é atingido.</li>
+<li><strong>Funcionamento:</strong> consulta o banco <strong>uma vez por métrica por arquivo</strong>, armazena limites no cache; se não houver limite, registra <code>[SEM LIMITE]</code>. Avalia o crítico da condição 1 e da condição 2 <strong>antes</strong> das atenções. Cria <code>Main.Ocorrencia</code> com operador e limite <strong>efetivamente disparados</strong>.</li>
+<li><strong>Exemplo:</strong> para <code>cpu_percent_percpu = 95</code>, com crítico <code>&gt; 90</code> e atenção <code>&gt; 70</code>, classifica como <strong>CRITICO</strong> (não ATENCAO), registrando <code>operador = &quot;&gt;&quot;</code>, <code>limite = 90</code>.</li>
+<li><strong>Segunda condição:</strong> para um exemplo didático com crítico <code>valor &lt; 10</code>, uma leitura de <code>7</code> também seria crítica, mesmo se a primeira condição fosse <code>valor &gt; 90</code>.</li>
+</ul>
+<p><strong><code>private static boolean atingiuLimite(double valor, Double limite, String operador)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> valor observado, limite opcional e operador configurado.</li>
+<li><strong>Saída:</strong> <code>true</code> se a comparação é satisfeita, <code>false</code> se não é.</li>
+<li><strong>Operadores:</strong> <code>&gt;</code>, <code>&gt;=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>=</code>/<code>==</code> e <code>!=</code>/<code>&lt;&gt;</code>; operador nulo/vazio vira <code>&gt;</code>; limite nulo retorna <code>false</code>; operador desconhecido registra aviso e retorna <code>false</code>.</li>
+<li><strong>Exemplos:</strong> <code>atingiuLimite(80, 70, &quot;&gt;&quot;) = true</code>, <code>atingiuLimite(70, 70, &quot;&gt;&quot;) = false</code>, <code>atingiuLimite(70, 70, &quot;&gt;=&quot;) = true</code>.</li>
+</ul>
+<p><strong><code>private static void registrarOcorrencia(Map&lt;String, Ocorrencia&gt; ocorrencias, Ocorrencia nova)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> mapa de ocorrências do lote e nova ocorrência.</li>
+<li><strong>Saída:</strong> atualização do mapa; nenhuma resposta direta.</li>
+<li><strong>Chave:</strong> <code>mac|recurso|metrica|campoOrigem</code>, preservando diferenças entre recursos da mesma máquina.</li>
+<li><strong>Exemplo:</strong> <code>CPU lógica 1</code> e <code>CPU lógica 2</code> não se misturam. Se a CPU lógica 1 teve atenção e depois crítico no <strong>mesmo lote</strong>, a ocorrência retida é crítica; se duas leituras são igualmente críticas, permanece a última percorrida.</li>
+</ul>
+<h3 id="54-lotes3service-descoberta-e-marcador-dos-lotes"><a class="hash" href="#54-lotes3service-descoberta-e-marcador-dos-lotes" aria-label="Link para esta seção">#</a>5.4 <code>LoteS3Service</code> — descoberta e marcador dos lotes</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/s3/LoteS3Service.java"><code>LoteS3Service.java</code></a><br />
+<strong>Papel:</strong> usar o mesmo <code>S3Client</code> e bucket para localizar capturas e controlar o processamento persistente.</p>
+<p><strong><code>public LoteS3Service(S3Client s3, String bucket)</code></strong></p>
+<p>Armazena as dependências da instância. Exemplo: <code>new LoteS3Service(s3Client, &quot;bucket-exemplo&quot;)</code>.</p>
+<p><strong><code>public List&lt;String&gt; obterChavesCaptura()</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> variáveis opcionais <code>S3_KEY</code> e <code>S3_PREFIX</code>.</li>
+<li><strong>Saída:</strong> lista de chaves S3.</li>
+<li><strong>Funcionamento:</strong> com <code>S3_KEY</code> não vazia, retorna somente essa chave; caso contrário, lista páginas com <code>listObjectsV2Paginator</code>, seleciona nomes terminados em <code>/capturas.json</code> e ordena alfabeticamente.</li>
+<li><strong>Exemplo:</strong> <code>S3_PREFIX=client/lotes/</code> pode localizar <code>client/lotes/maquina=.../lote=.../capturas.json</code>; não retorna outros arquivos JSON do prefixo.</li>
+</ul>
+<p><strong><code>public boolean loteJaProcessado(String chave)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> chave da captura.</li>
+<li><strong>Saída:</strong> <code>true</code> se a chave do marcador <code>.ok</code> existe, <code>false</code> se o S3 respondeu 404.</li>
+<li><strong>Funcionamento:</strong> monta o caminho com <code>chaveMarcador()</code> e chama <code>s3.headObject()</code>.</li>
+<li><strong>Exemplo:</strong> um <code>.ok</code> previamente criado faz a próxima execução ignorar o mesmo arquivo sem baixá-lo novamente.</li>
+<li><strong>Importante:</strong> erros 403 e 5xx não são interpretados como “não processado”; a exceção é propagada.</li>
+</ul>
+<p><strong><code>public void marcarLoteProcessado(String chave)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> chave da captura concluída.</li>
+<li><strong>Saída:</strong> objeto de texto no S3.</li>
+<li><strong>Funcionamento:</strong> usa <code>putObject()</code> com <code>STATUS=PROCESSADO</code>, <code>ORIGEM</code> e <code>DATA</code> (<code>Instant.now()</code>).</li>
+<li><strong>Exemplo de conteúdo do marcador:</strong></li>
+</ul>
+<div class="codeblock"><div class="codehead"><span class="code-lang">text</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code>STATUS=PROCESSADO
+ORIGEM=client/lotes/maquina=servidor-01/lote=lote-001/capturas.json
+DATA=2026-11-05T20:30:00Z
+</code></pre></div>
+<p>A data do exemplo é ilustrativa; o código usa o instante real da escrita.</p>
+<p><strong><code>private static String chaveMarcador(String chave)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> chave original que deve começar com <code>S3_PREFIX</code> e terminar em <code>/capturas.json</code>.</li>
+<li><strong>Saída:</strong> caminho equivalente sob <code>S3_PROCESSADOS_PREFIX</code>, com sufixo <code>.ok</code>.</li>
+<li><strong>Exemplo:</strong></li>
+</ul>
+<div class="codeblock"><div class="codehead"><span class="code-lang">text</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code>S3_PREFIX=client/lotes/
+S3_PROCESSADOS_PREFIX=client/controle/processados/
+
+Entrada: client/lotes/maquina=01/lote=abc/capturas.json
+Saída:   client/controle/processados/maquina=01/lote=abc/capturas.json.ok
+</code></pre></div>
+<ul>
+<li><strong>Falha:</strong> se <code>S3_KEY</code> apontar para um arquivo fora de <code>S3_PREFIX</code>, o processamento pode concluir, mas a criação do marcador lança <code>IllegalArgumentException</code>. É necessário manter os caminhos coerentes.</li>
+</ul>
+<h3 id="55-limitedao-consulta-jdbc-ao-mysql"><a class="hash" href="#55-limitedao-consulta-jdbc-ao-mysql" aria-label="Link para esta seção">#</a>5.5 <code>LimiteDao</code> — consulta JDBC ao MySQL</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/docker/LimiteDao.java"><code>LimiteDao.java</code></a><br />
+<strong>Papel:</strong> localizar a configuração de limites relacionada ao perfil do servidor.</p>
+<p><strong><code>public record Limite(...)</code></strong></p>
+<p>Representa a configuração retornada pelo SQL: <code>nomeColuna</code>, <code>nome</code>, <code>unidade</code>, <code>atencao</code>, <code>critico</code>, <code>operador</code>, <code>operador2</code>, <code>atencao2</code> e <code>critico2</code>. A segunda condição pode estar ausente (<code>null</code>).</p>
+<p><strong><code>public LimiteDao(MySqlProvider provider)</code></strong></p>
+<p>Recebe o objeto que abre conexões JDBC, sem criar internamente as configurações do banco.</p>
+<p><strong><code>public Map&lt;String, Limite&gt; buscarPorMac(String mac, Collection&lt;String&gt; nomesMetricas)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> MAC do servidor e métricas identificadas no JSON.</li>
+<li><strong>Saída:</strong> mapa de configurações por identificador de coluna em minúsculas.</li>
+<li><strong>Funcionamento:</strong> normaliza nomes (<code>trim</code>, minúsculas, <code>distinct</code>), monta placeholders <code>?</code> para o <code>IN</code>, executa <code>SELECT DISTINCT</code> com <code>PreparedStatement</code> nas tabelas <code>servidores</code>, <code>componentes_perfil</code> e <code>componentes</code>, filtrando configurações que possuem ao menos um limite preenchido.</li>
+<li><strong>Exemplo:</strong> <code>buscarPorMac(&quot;02:00:00:00:00:01&quot;, List.of(&quot;cpu_percent&quot;, &quot;ram_percent&quot;))</code> só retorna as métricas habilitadas no perfil daquele servidor com limite configurado; a existência da métrica no JSON, isoladamente, não basta.</li>
+<li><strong>Segurança:</strong> a consulta usa parâmetros em vez de concatenar valores do MAC e dos nomes das métricas diretamente no SQL.</li>
+<li><strong>Falhas:</strong> problemas de conexão/SQL lançam <code>SQLException</code>, encapsulada como <code>IOException</code> pelo <code>ProcessadorJson</code>.</li>
+</ul>
+<p><strong><code>private static Double paraDouble(BigDecimal valor)</code></strong></p>
+<p>Converte o decimal do <code>ResultSet</code> para <code>Double</code>, mantendo <code>null</code> quando o limite não foi configurado. Exemplo: <code>BigDecimal(&quot;90.00&quot;) → 90.0</code>.</p>
+<h3 id="56-mysqlprovider-conexao-ao-banco"><a class="hash" href="#56-mysqlprovider-conexao-ao-banco" aria-label="Link para esta seção">#</a>5.6 <code>MySqlProvider</code> — conexão ao banco</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/client/MySqlProvider.java"><code>MySqlProvider.java</code></a></p>
+<p><strong><code>public MySqlProvider()</code></strong> constrói a URL JDBC a partir de <code>DB_HOST</code>, <code>DB_PORT</code> (padrão <code>3306</code>), <code>DB_NAME</code>, <code>DB_USER</code> e <code>DB_PASSWORD</code>. O código atual acrescenta <code>useSSL=false</code>, <code>allowPublicKeyRetrieval=true</code> e <code>serverTimezone=UTC</code> à URL.</p>
+<p><strong><code>public Connection getConnection() throws SQLException</code></strong> usa <code>DriverManager.getConnection(url, usuario, senha)</code> e devolve uma conexão ao DAO. <strong>Exemplo:</strong> quando <code>DB_HOST=mysql</code> dentro de uma rede Docker, o nome <code>mysql</code> é resolvido no contexto da rede do contêiner; executar Java fora dessa rede exige um endereço/porta acessíveis a partir do host.</p>
+<h3 id="57-s3provider-cliente-aws"><a class="hash" href="#57-s3provider-cliente-aws" aria-label="Link para esta seção">#</a>5.7 <code>S3Provider</code> — cliente AWS</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/client/S3Provider.java"><code>S3Provider.java</code></a></p>
+<p><strong><code>public S3Provider()</code></strong> cria <code>DefaultCredentialsProvider</code>, permitindo usar a cadeia padrão de credenciais da AWS, incluindo IAM Role de EC2 quando configurada.</p>
+<p><strong><code>public S3Client getS3Client()</code></strong> lê <code>AWS_REGION</code> (padrão <code>us-east-1</code>) e devolve um cliente regionalizado com as credenciais configuradas. <strong>Exemplo:</strong> na EC2, uma IAM Role pode dar acesso ao bucket sem chaves fixas no <code>.env</code>. O consumidor deve fechar o cliente, como já acontece no <code>try-with-resources</code> do <code>ProcessamentoService</code>.</p>
+<h3 id="58-env-leitura-e-validacao-de-configuracao"><a class="hash" href="#58-env-leitura-e-validacao-de-configuracao" aria-label="Link para esta seção">#</a>5.8 <code>Env</code> — leitura e validação de configuração</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/config/Env.java"><code>Env.java</code></a></p>
+<p><strong>Inicialização estática <code>DOTENV</code>:</strong> carrega o <code>.env</code> do diretório <code>System.getProperty(&quot;user.dir&quot;)</code>, tolerando arquivo ausente. As variáveis do sistema podem prevalecer, conforme o comportamento do <code>dotenv-java</code> usado na aplicação.</p>
+<p><strong><code>private Env()</code></strong> impede a instanciação da classe utilitária.</p>
+<p><strong><code>public static String get(String nome, String valorPadrao)</code></strong> retorna uma variável não vazia sem espaços nas pontas ou o padrão fornecido. <strong>Exemplo:</strong> <code>Env.get(&quot;DB_PORT&quot;, &quot;3306&quot;)</code> devolve <code>3306</code> quando a variável está ausente.</p>
+<p><strong><code>public static String require(String nome)</code></strong> devolve uma configuração obrigatória ou lança <code>IllegalStateException</code>. <strong>Exemplo:</strong> <code>Env.require(&quot;S3_BUCKET&quot;)</code> interrompe o ciclo com mensagem explicativa se o nome do bucket não tiver sido configurado.</p>
+<h3 id="59-chamadoservice-regras-de-negocio-do-jira"><a class="hash" href="#59-chamadoservice-regras-de-negocio-do-jira" aria-label="Link para esta seção">#</a>5.9 <code>ChamadoService</code> — regras de negócio do Jira</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/service/ChamadoService.java"><code>ChamadoService.java</code></a></p>
+<p><strong><code>public static void criarTicket(Jira jira, Main.Ocorrencia alerta) throws IOException</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> cliente Jira e ocorrência classificada.</li>
+<li><strong>Funcionamento:</strong> gera etiqueta, monta título, limita o título a 255 caracteres, busca uma issue não concluída com a mesma etiqueta; se já existe e a ocorrência é <code>CRITICO</code>, chama <code>atualizarChamadoParaCritico()</code>; se já existe e é <code>ATENCAO</code>, não altera a issue; se não existe, chama <code>createIssue()</code>.</li>
+<li><strong>Exemplo:</strong> CPU lógica 1 a 80% cria um chamado de atenção. Um lote posterior da mesma CPU a 95% encontra o chamado pela etiqueta e o promove para crítico <strong>sem criar outra issue</strong>.</li>
+<li><strong>Importante:</strong> somente a <strong>primeira</strong> chegada ao nível crítico altera título/etiqueta. Se o título já começar com <code>[CRÍTICO]</code> e a etiqueta crítica já existir, novos valores críticos <strong>não atualizam o número do título</strong>.</li>
+<li><strong>Interrupção:</strong> preserva o estado da thread e encapsula <code>InterruptedException</code> como <code>IOException</code> na criação.</li>
+</ul>
+<p><strong><code>private static String montarTitulo(Main.Ocorrencia alerta)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> gravidade, recurso, nome da métrica, valor, operador, limite, MAC.</li>
+<li><strong>Saída:</strong> título legível, formatado com vírgula decimal no padrão brasileiro.</li>
+<li><strong>Exemplo:</strong></li>
+</ul>
+<div class="codeblock"><div class="codehead"><span class="code-lang">text</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code>[ATENÇÃO] Uso elevado de CPU lógica 1 — 80,0% (limite &gt; 70,0%) | Servidor 02:00:00:00:00:01
+</code></pre></div>
+<ul>
+<li><strong>Regras:</strong> conhece nomes <code>cpu_percent</code>, <code>cpu_percent_percpu</code> e <code>ram_percent</code>; para operador iniciado por <code>&lt;</code>, usa descrição de “valor baixo”; aplica <code>%</code> apenas a alguns nomes específicos, como <code>disk_percent</code>. Outras métricas aparecem com seu nome técnico e sem unidade adicionada.</li>
+</ul>
+<p><strong><code>private static String gerarEtiqueta(Main.Ocorrencia alerta)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> MAC, recurso, métrica e <code>campoOrigem</code> (valor vazio quando nulo).</li>
+<li><strong>Saída:</strong> <code>coretrace-</code> seguido dos <strong>24 primeiros caracteres hexadecimais</strong> do SHA-256 do identificador em minúsculas.</li>
+<li><strong>Exemplo:</strong> CPU lógica 1 com 80% ou 95%, no mesmo MAC e campo de origem, gera <strong>a mesma etiqueta</strong>, porque o valor e a gravidade não fazem parte da identificação. CPU lógica 2 gera uma etiqueta diferente.</li>
+</ul>
+<h3 id="510-jira-cliente-rest-do-jira-cloud"><a class="hash" href="#510-jira-cliente-rest-do-jira-cloud" aria-label="Link para esta seção">#</a>5.10 <code>Jira</code> — cliente REST do Jira Cloud</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/config/Jira.java"><code>Jira.java</code></a></p>
+<p><strong><code>public Jira(String baseUrl, String email, String apiToken)</code></strong></p>
+<p>Prepara autenticação HTTP Basic com e-mail + token codificados em Base64, <code>HttpClient</code> com timeout de conexão de 30 segundos e <code>ObjectMapper</code> do Jackson. Base64 <strong>não é criptografia</strong>: a URL deve ser HTTPS, e o token não deve aparecer em logs.</p>
+<p><strong><code>public String createIssue(String projectKey, String summary, String issueType)</code></strong></p>
+<p>Sobrecarga de compatibilidade que delega a <code>createIssue(projectKey, summary, issueType, null)</code>. <strong>Exemplo:</strong> criação de issue sem etiqueta.</p>
+<p><strong><code>public String createIssue(String projectKey, String summary, String issueType, String etiqueta)</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> chave do projeto, título, nome do tipo (padrão configurado pelo chamador) e etiqueta opcional.</li>
+<li><strong>Funcionamento:</strong> monta os DTOs (<code>ProjectDto</code>, <code>IssueTypeDto</code>, <code>IssueFieldsDto</code>, <code>IssueRequestDto</code>), converte-os para <code>ObjectNode</code>, acrescenta <code>fields.labels</code> quando necessário e envia <code>POST /rest/api/3/issue</code>.</li>
+<li><strong>Saída:</strong> corpo da resposta HTTP quando o status for 2xx (uma string JSON, não apenas a chave da issue).</li>
+<li><strong>Falhas:</strong> status não 2xx gera <code>IOException</code> com código HTTP e corpo devolvido pelo Jira.</li>
+<li><strong>Exemplo de corpo enviado (dados ilustrativos):</strong></li>
+</ul>
+<div class="codeblock"><div class="codehead"><span class="code-lang">json</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;project&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CT&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;[ATENÇÃO] Uso elevado de CPU lógica 1 — 80,0% (limite &gt; 70,0%) | Servidor 02:00:00:00:00:01&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;issuetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Task&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;labels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;coretrace-&lt;hash-do-problema&gt;&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong><code>public String buscarChamadoAberto(String projectKey, String etiqueta) throws IOException</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> chave do projeto e etiqueta estável.</li>
+<li><strong>Funcionamento:</strong> faz <code>POST /rest/api/3/search/jql</code> com <code>maxResults=1</code> e uma consulta JQL equivalente a:</li>
+</ul>
+<div class="codeblock"><div class="codehead"><span class="code-lang">sql</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code><span class="n">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ss">&quot;CT&quot;</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ss">&quot;coretrace-&lt;hash-do-problema&gt;&quot;</span>
+<span class="k">AND</span><span class="w"> </span><span class="n">statusCategory</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">Done</span>
+</code></pre></div>
+<ul>
+<li><strong>Saída:</strong> chave da primeira issue (<code>&quot;CT-15&quot;</code>) ou <code>null</code> quando <code>issues</code> é uma lista vazia.</li>
+<li><strong>Falhas:</strong> resposta HTTP diferente de 200, JSON inválido ou ausência de estrutura esperada geram <code>IOException</code>; um erro <strong>não é confundido com “nenhum chamado”</strong>.</li>
+<li><strong>Observação:</strong> a busca depende da indexação do Jira; resultados recém-criados podem não aparecer imediatamente.</li>
+</ul>
+<p><strong><code>public boolean atualizarChamadoParaCritico(String chaveChamado, String novoTitulo) throws IOException</code></strong></p>
+<ul>
+<li><strong>Entrada:</strong> chave da issue existente e título crítico proposto.</li>
+<li><strong>Funcionamento:</strong> <code>GET /rest/api/3/issue/{chave}?fields=summary,labels</code>; verifica se o título começa com <code>[CRÍTICO]</code>/<code>[CRITICO]</code> e se a etiqueta <code>coretrace-critico</code> existe. Se faltar algo, envia <code>PUT</code> com <code>fields.summary</code> e/ou operação de adição em <code>update.labels</code>.</li>
+<li><strong>Saída:</strong> <code>true</code> quando enviou uma atualização bem-sucedida; <code>false</code> quando a issue já estava classificada como crítica tanto no título quanto na etiqueta.</li>
+<li><strong>Exemplo:</strong> <code>CT-15</code>, que era atenção, torna-se crítico sem perder a etiqueta hash do problema.</li>
+<li><strong>Limite da implementação:</strong> não altera o campo nativo <strong>Priority</strong> nem a transição de <strong>status</strong>; o encerramento permanece manual.</li>
+</ul>
+<h3 id="511-schoolsptechmodelocorrencia-record-de-modelo"><a class="hash" href="#511-schoolsptechmodelocorrencia-record-de-modelo" aria-label="Link para esta seção">#</a>5.11 <code>school.sptech.model.Ocorrencia</code> — record de modelo</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/model/Ocorrencia.java"><code>model/Ocorrencia.java</code></a></p>
+<p><strong><code>public record Ocorrencia(...)</code></strong> contém os mesmos oito campos de <code>Main.Ocorrencia</code> e seus acessores gerados automaticamente, como <code>mac()</code>, <code>valor()</code> e <code>nivel()</code>. <strong>Exemplo de uso direto:</strong> <code>new school.sptech.model.Ocorrencia(...).nivel()</code> devolveria o nível fornecido.</p>
+<p><strong>Estado no ZIP:</strong> <strong>não é utilizado</strong> pelos serviços examinados, que importam <code>Main.Ocorrencia</code>. Essa distinção é importante ao navegar pelo projeto ou planejar uma unificação futura dos modelos.</p>
+<h3 id="512-projectdto-projeto-da-issue"><a class="hash" href="#512-projectdto-projeto-da-issue" aria-label="Link para esta seção">#</a>5.12 <code>ProjectDto</code> — projeto da issue</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/dto/ProjectDto.java"><code>ProjectDto.java</code></a></p>
+<ul>
+<li><strong><code>ProjectDto()</code></strong>: construtor vazio, útil para serialização/desserialização.</li>
+<li><strong><code>ProjectDto(String key)</code></strong>: cria o objeto com a chave do projeto; exemplo <code>new ProjectDto(&quot;CT&quot;)</code>.</li>
+<li><strong><code>getKey()</code></strong>: devolve a chave atual, como <code>&quot;CT&quot;</code>.</li>
+<li><strong><code>setKey(String key)</code></strong>: modifica a chave.</li>
+<li><strong>Forma JSON:</strong> <code>{ &quot;key&quot;: &quot;CT&quot; }</code>.</li>
+</ul>
+<h3 id="513-issuetypedto-tipo-da-issue"><a class="hash" href="#513-issuetypedto-tipo-da-issue" aria-label="Link para esta seção">#</a>5.13 <code>IssueTypeDto</code> — tipo da issue</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/dto/IssueTypeDto.java"><code>IssueTypeDto.java</code></a></p>
+<ul>
+<li><strong><code>IssueTypeDto()</code></strong>: construtor vazio.</li>
+<li><strong><code>IssueTypeDto(String name)</code></strong>: cria um tipo como <code>&quot;Task&quot;</code>.</li>
+<li><strong><code>getName()</code></strong>: devolve o nome do tipo.</li>
+<li><strong><code>setName(String name)</code></strong>: altera o nome.</li>
+<li><strong>Forma JSON:</strong> <code>{ &quot;name&quot;: &quot;Task&quot; }</code>.</li>
+</ul>
+<h3 id="514-issuefieldsdto-campos-da-issue"><a class="hash" href="#514-issuefieldsdto-campos-da-issue" aria-label="Link para esta seção">#</a>5.14 <code>IssueFieldsDto</code> — campos da issue</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/dto/IssueFieldsDto.java"><code>IssueFieldsDto.java</code></a></p>
+<ul>
+<li><strong><code>IssueFieldsDto()</code></strong>: construtor vazio.</li>
+<li><strong><code>IssueFieldsDto(ProjectDto project, String summary, IssueTypeDto issuetype)</code></strong>: reúne os três campos básicos usados na criação.</li>
+<li><strong><code>getProject()</code> / <code>setProject(ProjectDto)</code></strong>: lê/altera o projeto.</li>
+<li><strong><code>getSummary()</code> / <code>setSummary(String)</code></strong>: lê/altera o título.</li>
+<li><strong><code>getIssuetype()</code> / <code>setIssuetype(IssueTypeDto)</code></strong>: lê/altera o tipo.</li>
+<li><strong>Exemplo:</strong> <code>new IssueFieldsDto(new ProjectDto(&quot;CT&quot;), &quot;CPU em atenção&quot;, new IssueTypeDto(&quot;Task&quot;))</code>.</li>
+</ul>
+<h3 id="515-issuerequestdto-corpo-da-requisicao"><a class="hash" href="#515-issuerequestdto-corpo-da-requisicao" aria-label="Link para esta seção">#</a>5.15 <code>IssueRequestDto</code> — corpo da requisição</h3>
+<p><strong>Arquivo:</strong> <a href="../src/main/java/school/sptech/dto/IssueRequestDto.java"><code>IssueRequestDto.java</code></a></p>
+<ul>
+<li><strong><code>IssueRequestDto()</code></strong>: construtor vazio.</li>
+<li><strong><code>IssueRequestDto(IssueFieldsDto fields)</code></strong>: encapsula os campos sob a propriedade <code>fields</code>.</li>
+<li><strong><code>getFields()</code> / <code>setFields(IssueFieldsDto)</code></strong>: lê/altera os campos.</li>
+<li><strong>Exemplo:</strong> <code>new IssueRequestDto(fields)</code> produz, após serialização pelo Jackson, a estrutura <code>{ &quot;fields&quot;: { ... } }</code>.</li>
+</ul>
+<h2 id="6-cenarios-praticos-completos"><a class="hash" href="#6-cenarios-praticos-completos" aria-label="Link para esta seção">#</a>6. Cenários práticos completos</h2>
+<h3 id="cenario-a-primeira-captura-acima-do-limite-de-atencao"><a class="hash" href="#cenario-a-primeira-captura-acima-do-limite-de-atencao" aria-label="Link para esta seção">#</a>Cenário A — primeira captura acima do limite de atenção</h3>
+<p><strong>Configuração didática no MySQL:</strong> servidor com MAC <code>02:00:00:00:00:01</code>, métrica <code>cpu_percent_percpu</code> habilitada, <code>operador = &quot;&gt;&quot;</code>, <code>limite_atencao = 70</code> e <code>limite_critico = 90</code>.</p>
+<ol>
+<li>Um arquivo JSON novo informa <code>CPU lógica 1 = 80</code> com <code>status = &quot;ok&quot;</code>.</li>
+<li>O <code>ProcessadorJson</code> contabiliza a leitura, busca o limite no <code>LimiteDao</code> e produz <code>ATENCAO</code>, operador <code>&gt;</code>, limite <code>70</code>.</li>
+<li><code>registrarOcorrencia()</code> adiciona a chave <code>MAC|CPU lógica 1|cpu_percent_percpu|cpu_percent_percpu</code>.</li>
+<li><code>ChamadoService</code> gera um título legível e uma etiqueta baseada em SHA-256.</li>
+<li>Sem issue não concluída com essa etiqueta, <code>Jira.createIssue()</code> cria um chamado de atenção.</li>
+<li>Ao finalizar o arquivo, <code>LoteS3Service</code> grava o <code>.ok</code>.</li>
+</ol>
+<p><strong>Resultado esperado:</strong> um chamado de atenção e um marcador <code>.ok</code> para o arquivo.</p>
+<h3 id="cenario-b-mesmo-problema-evolui-para-critico-em-outro-lote"><a class="hash" href="#cenario-b-mesmo-problema-evolui-para-critico-em-outro-lote" aria-label="Link para esta seção">#</a>Cenário B — mesmo problema evolui para crítico em outro lote</h3>
+<ol>
+<li>Cinco minutos depois, chega <strong>outro</strong> <code>capturas.json</code> com a mesma máquina/recurso/métrica, agora <code>95</code>.</li>
+<li>O segundo lote não possui <code>.ok</code>, então é avaliado normalmente.</li>
+<li>O crítico <code>95 &gt; 90</code> prevalece sobre a atenção <code>95 &gt; 70</code>.</li>
+<li>A etiqueta da ocorrência permanece igual, pois <code>gerarEtiqueta()</code> não usa <code>valor</code>, <code>nivel</code> ou <code>lote_id</code>.</li>
+<li>O Jira encontra a issue de atenção e <code>atualizarChamadoParaCritico()</code> altera o título e adiciona <code>coretrace-critico</code>.</li>
+<li>O novo lote recebe seu próprio <code>.ok</code>.</li>
+</ol>
+<p><strong>Resultado esperado:</strong> <strong>a mesma issue</strong> passa a indicar crítico. Não é criada uma segunda issue quando a busca encontra corretamente a primeira.</p>
+<h3 id="cenario-c-mesma-captura-processada-outra-vez"><a class="hash" href="#cenario-c-mesma-captura-processada-outra-vez" aria-label="Link para esta seção">#</a>Cenário C — mesma captura processada outra vez</h3>
+<p>A aplicação reinicia e encontra um arquivo já marcado:</p>
+<div class="codeblock"><div class="codehead"><span class="code-lang">text</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code>[IGNORADO] Arquivo já processado: client/lotes/.../capturas.json
+</code></pre></div>
+<p><code>loteJaProcessado()</code> confirma o <code>.ok</code> com <code>headObject()</code>, o arquivo não é baixado e nenhum novo chamado é gerado por essa execução.</p>
+<h3 id="cenario-d-problema-normaliza-mas-o-chamado-continua-aberto"><a class="hash" href="#cenario-d-problema-normaliza-mas-o-chamado-continua-aberto" aria-label="Link para esta seção">#</a>Cenário D — problema normaliza, mas o chamado continua aberto</h3>
+<p>Depois de um crítico, a CPU cai para 50%, sem atingir nenhum limite. <code>avaliarMetrica()</code> não cria uma ocorrência, de modo que o Jira <strong>não recebe pedido de edição ou encerramento</strong>. A equipe continua responsável pela conclusão manual do ticket.</p>
+<h3 id="cenario-e-limite-inferior-e-superior-na-mesma-metrica"><a class="hash" href="#cenario-e-limite-inferior-e-superior-na-mesma-metrica" aria-label="Link para esta seção">#</a>Cenário E — limite inferior e superior na mesma métrica</h3>
+<p><strong>Configuração didática:</strong> condição 1 <code>&gt; 90</code> crítico e <code>&gt; 70</code> atenção; condição 2 <code>&lt; 10</code> crítico e <code>&lt; 20</code> atenção.</p>
+<div class="table-container"><table>
+<thead>
+<tr>
+  <th>Leitura</th>
+  <th>Comparação</th>
+  <th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>95</code></td>
+  <td><code>95 &gt; 90</code></td>
+  <td><code>CRITICO</code> (condição 1)</td>
+</tr>
+<tr>
+  <td><code>80</code></td>
+  <td><code>80 &gt; 70</code></td>
+  <td><code>ATENCAO</code> (condição 1)</td>
+</tr>
+<tr>
+  <td><code>7</code></td>
+  <td><code>7 &lt; 10</code></td>
+  <td><code>CRITICO</code> (condição 2)</td>
+</tr>
+<tr>
+  <td><code>15</code></td>
+  <td><code>15 &lt; 20</code></td>
+  <td><code>ATENCAO</code> (condição 2)</td>
+</tr>
+<tr>
+  <td><code>50</code></td>
+  <td>Nenhuma condição</td>
+  <td>Sem ocorrência</td>
+</tr>
+</tbody>
+</table></div>
+<p>Essa tabela demonstra a lógica de comparação, não pressupõe que tais limites já estejam cadastrados no banco do projeto.</p>
+<h3 id="cenario-f-falha-do-jira-e-reprocessamento-posterior"><a class="hash" href="#cenario-f-falha-do-jira-e-reprocessamento-posterior" aria-label="Link para esta seção">#</a>Cenário F — falha do Jira e reprocessamento posterior</h3>
+<p>Se o Jira responder com erro durante <code>createIssue()</code>, a exceção chega a <code>ProcessamentoService</code> como <code>IOException</code>; aquele lote <strong>não recebe</strong> seu <code>.ok</code>. No ciclo seguinte, poderá ser tentado novamente. Se um ticket anterior tiver sido criado parcialmente, a consulta por etiqueta pode encontrá-lo e evitar outra abertura, <strong>mas não existe garantia transacional de exatamente uma issue</strong>.</p>
+<h2 id="7-configuracao-e-execucao"><a class="hash" href="#7-configuracao-e-execucao" aria-label="Link para esta seção">#</a>7. Configuração e execução</h2>
+<h3 id="dependencias-e-build"><a class="hash" href="#dependencias-e-build" aria-label="Link para esta seção">#</a>Dependências e build</h3>
+<p>O <code>pom.xml</code> da versão analisada utiliza <strong>Java 21</strong>, Maven, Jackson Databind, AWS SDK S3, dotenv-java, MySQL Connector/J e Maven Shade Plugin. O projeto configura o manifesto para <code>school.sptech.Main</code> e gera o JAR empacotado <strong><code>target/coretrace.jar</code></strong>.</p>
+<div class="codeblock"><div class="codehead"><span class="code-lang">bash</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code><span class="c1"># Na raiz do repositório, com JDK 21 e Maven disponíveis</span>
+mvn<span class="w"> </span>clean<span class="w"> </span>package
+java<span class="w"> </span>-jar<span class="w"> </span>target/coretrace.jar
+</code></pre></div>
+<p><strong>Comportamento esperado:</strong> depois de iniciar, o processo permanece ativo e executa ciclos periódicos. Para interrompê-lo em primeiro plano, use <code>Ctrl+C</code>.</p>
+<h3 id="variaveis-de-ambiente"><a class="hash" href="#variaveis-de-ambiente" aria-label="Link para esta seção">#</a>Variáveis de ambiente</h3>
+<p>Este é um <strong>modelo sem credenciais reais</strong>. Não publique o <code>.env</code> do ZIP ou tokens e senhas em issues, commits e documentação.</p>
+<div class="codeblock"><div class="codehead"><span class="code-lang">dotenv</span><button class="copy" type="button" title="Copiar trecho de código">Copiar</button></div><pre><code># Banco de dados
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=nome_do_banco
+DB_USER=usuario_com_permissao_de_leitura
+DB_PASSWORD=SUBSTITUIR_LOCALMENTE
+
+# Armazenamento
+AWS_REGION=us-east-1
+S3_BUCKET=nome_do_bucket
+S3_PREFIX=client/lotes/
+S3_PROCESSADOS_PREFIX=client/controle/processados/
+# S3_KEY=client/lotes/maquina=.../lote=.../capturas.json
+
+# Jira
+JIRA_BASE_URL=https://sua-organizacao.atlassian.net
+JIRA_EMAIL=usuario@exemplo.com
+JIRA_API_TOKEN=SUBSTITUIR_LOCALMENTE
+JIRA_PROJECT_KEY=CT
+JIRA_ISSUE_TYPE=Task
+</code></pre></div>
+<div class="table-container"><table>
+<thead>
+<tr>
+  <th>Variável</th>
+  <th>Obrigatória em <code>validarConfiguracao()</code>?</th>
+  <th>Padrão / uso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>DB_HOST</code></td>
+  <td>Sim</td>
+  <td>Host do MySQL</td>
+</tr>
+<tr>
+  <td><code>DB_PORT</code></td>
+  <td>Não</td>
+  <td><code>3306</code></td>
+</tr>
+<tr>
+  <td><code>DB_NAME</code></td>
+  <td>Sim</td>
+  <td>Banco/schema</td>
+</tr>
+<tr>
+  <td><code>DB_USER</code> / <code>DB_PASSWORD</code></td>
+  <td>Sim</td>
+  <td>Credenciais JDBC</td>
+</tr>
+<tr>
+  <td><code>AWS_REGION</code></td>
+  <td>Não</td>
+  <td><code>us-east-1</code></td>
+</tr>
+<tr>
+  <td><code>S3_BUCKET</code></td>
+  <td>Sim</td>
+  <td>Nome do bucket</td>
+</tr>
+<tr>
+  <td><code>S3_PREFIX</code></td>
+  <td>Não</td>
+  <td><code>client/lotes</code>/<code>client/lotes/</code> (normalizados)</td>
+</tr>
+<tr>
+  <td><code>S3_KEY</code></td>
+  <td>Não</td>
+  <td>Quando presente, seleciona uma chave única</td>
+</tr>
+<tr>
+  <td><code>S3_PROCESSADOS_PREFIX</code></td>
+  <td>Não</td>
+  <td><strong>No código, o padrão ainda é <code>client/controle/testes-processados/</code></strong></td>
+</tr>
+<tr>
+  <td><code>JIRA_BASE_URL</code></td>
+  <td>Sim</td>
+  <td>URL base da instância Jira</td>
+</tr>
+<tr>
+  <td><code>JIRA_EMAIL</code> / <code>JIRA_API_TOKEN</code></td>
+  <td>Sim</td>
+  <td>HTTP Basic</td>
+</tr>
+<tr>
+  <td><code>JIRA_PROJECT_KEY</code></td>
+  <td>Sim</td>
+  <td>Chave do projeto</td>
+</tr>
+<tr>
+  <td><code>JIRA_ISSUE_TYPE</code></td>
+  <td>Não</td>
+  <td><code>Task</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Observação:</strong> no <code>.env</code> de produção, configure <code>S3_PROCESSADOS_PREFIX</code> explicitamente para não usar acidentalmente o prefixo padrão de testes. O exemplo acima não contém segredos utilizáveis.</p>
+<h3 id="permissoes-de-infraestrutura"><a class="hash" href="#permissoes-de-infraestrutura" aria-label="Link para esta seção">#</a>Permissões de infraestrutura</h3>
+<ul>
+<li><strong>S3:</strong> listar o bucket/prefixo, ler capturas e metadados, e gravar marcadores <code>.ok</code> (<code>ListBucket</code>, <code>GetObject</code> e <code>PutObject</code> nos recursos apropriados). As políticas exatas dependem de como os prefixos estão organizados.</li>
+<li><strong>MySQL:</strong> executar <code>SELECT</code> nas tabelas <code>servidores</code>, <code>componentes_perfil</code>, <code>componentes</code> e acessar o banco a partir do ambiente do Java.</li>
+<li><strong>Jira:</strong> credenciais válidas e permissões para procurar, criar e editar issues do projeto. Para escalonar é necessário que os campos de título e etiquetas estejam disponíveis para edição.</li>
+</ul>
+<h2 id="8-operacao-logs-e-resolucao-de-problemas"><a class="hash" href="#8-operacao-logs-e-resolucao-de-problemas" aria-label="Link para esta seção">#</a>8. Operação, logs e resolução de problemas</h2>
+<div class="table-container"><table>
+<thead>
+<tr>
+  <th>Log ou sintoma</th>
+  <th>Onde observar</th>
+  <th>Interpretação e ação sugerida</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>Nenhum JSON encontrado no S3.</code></td>
+  <td><code>ProcessamentoService</code></td>
+  <td>Confira <code>S3_BUCKET</code>, <code>S3_PREFIX</code> ou <code>S3_KEY</code> e o sufixo <code>/capturas.json</code>.</td>
+</tr>
+<tr>
+  <td><code>[IGNORADO] Arquivo já processado</code></td>
+  <td><code>LoteS3Service</code> + orquestração</td>
+  <td>Existe <code>.ok</code> para a chave; isso é comportamento esperado.</td>
+</tr>
+<tr>
+  <td><code>MAC não identificado</code></td>
+  <td><code>processarJson()</code></td>
+  <td><code>endereco_mac</code> não foi lido antes do array; confira o JSON de origem.</td>
+</tr>
+<tr>
+  <td><code>Esperado array: metricas</code></td>
+  <td><code>processarJson()</code></td>
+  <td>O campo existe, mas não contém array.</td>
+</tr>
+<tr>
+  <td><code>[SEM LIMITE]</code></td>
+  <td><code>ProcessadorJson</code></td>
+  <td>Métrica válida sem limite retornado para o MAC/perfil.</td>
+</tr>
+<tr>
+  <td><code>[COMPARANDO]</code></td>
+  <td><code>ProcessadorJson</code></td>
+  <td>O programa encontrou configuração e está avaliando os operadores.</td>
+</tr>
+<tr>
+  <td><code>[JIRA] Chamado criado</code></td>
+  <td><code>ChamadoService</code></td>
+  <td>O POST teve resposta de sucesso.</td>
+</tr>
+<tr>
+  <td><code>[JIRA] Chamado ... já existe</code></td>
+  <td><code>ChamadoService</code></td>
+  <td>Busca por etiqueta encontrou issue não concluída.</td>
+</tr>
+<tr>
+  <td><code>[JIRA] Chamado ... atualizado para CRITICO</code></td>
+  <td><code>ChamadoService</code></td>
+  <td>O PUT foi aceito; mesma issue escalada.</td>
+</tr>
+<tr>
+  <td><code>HTTP 400</code> com erro no projeto</td>
+  <td><code>Jira</code></td>
+  <td>Confira <code>JIRA_PROJECT_KEY</code> e permissões da conta.</td>
+</tr>
+<tr>
+  <td><code>[ERRO PROCESSAMENTO]</code></td>
+  <td><code>ProcessamentoService</code></td>
+  <td>Uma <code>IOException</code> impediu o <code>.ok</code> daquele arquivo.</td>
+</tr>
+<tr>
+  <td><code>Chave de captura inválida</code></td>
+  <td><code>LoteS3Service</code></td>
+  <td><code>S3_KEY</code> e <code>S3_PREFIX</code> não são compatíveis com a regra de <code>chaveMarcador()</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Comportamento de mensagens:</strong> a camada de orquestração captura erros por arquivo e continua tentando outros lotes. Ao fim do ciclo, a mensagem “Processamento concluído” <strong>não significa necessariamente que todos os arquivos foram processados sem erro</strong>; observe as mensagens individuais.</p>
+<h2 id="9-limitacoes-conhecidas-da-versao-documentada"><a class="hash" href="#9-limitacoes-conhecidas-da-versao-documentada" aria-label="Link para esta seção">#</a>9. Limitações conhecidas da versão documentada</h2>
+<p>Estas observações descrevem pontos concretos do código e <strong>não indicam alterações feitas por esta documentação</strong>.</p>
+<ol>
+<li><strong>Dois tipos <code>Ocorrencia</code>:</strong> existe <code>Main.Ocorrencia</code> e <code>model.Ocorrencia</code>, mas o fluxo utiliza o primeiro.</li>
+<li><strong>Comentário legado sobre CSV:</strong> <code>CONFIGURACAO.md</code> e alguns comentários mencionam CSV; a implementação Java atual lê objetos <strong>JSON</strong> (<code>capturas.json</code>).</li>
+<li><strong>Ordenação de propriedades:</strong> o MAC deve aparecer antes dos arrays; a identificação do recurso pai também pode depender da ordem dos campos aninhados.</li>
+<li><strong>Validação de <code>lote_id</code>:</strong> seu conteúdo é lido e exibido, mas a versão analisada não rejeita explicitamente um <code>lote_id</code> ausente ou vazio.</li>
+<li><strong>Parâmetro <code>jaAlertados</code>:</strong> é criado e passado a <code>processarJson()</code>, mas não participa da lógica atual.</li>
+<li><strong>Título crítico estático:</strong> após marcar a issue como crítica (título e etiqueta), leituras críticas posteriores não atualizam novamente o valor numérico exibido no título.</li>
+<li><strong>Deduplicação não transacional:</strong> não há travamento de lotes entre múltiplas instâncias nem garantia de exatamente um ticket em falhas intermediárias ou atraso de indexação JQL.</li>
+<li><strong>Critério do chamado aberto:</strong> <code>statusCategory != Done</code> significa “não concluído”, e não necessariamente apenas o status literal “Open”.</li>
+<li><strong>Sem encerramento automático:</strong> valores normais não rebaixam nem concluem chamados.</li>
+<li><strong>Prioridade nativa Jira:</strong> a escalada altera título e etiqueta; não altera o campo <code>priority</code> do Jira.</li>
+<li><strong>Prefixo padrão de testes:</strong> <code>S3_PROCESSADOS_PREFIX</code> aponta para <code>client/controle/testes-processados/</code> se não for definido explicitamente.</li>
+<li><strong>Configuração JDBC atual:</strong> o driver usa <code>useSSL=false</code>; para uso produtivo, a política de criptografia de transporte merece revisão separada.</li>
+</ol>
+<h2 id="10-roteiro-recomendado-de-validacao"><a class="hash" href="#10-roteiro-recomendado-de-validacao" aria-label="Link para esta seção">#</a>10. Roteiro recomendado de validação</h2>
+<p>Este ZIP não forneceu uma suíte de testes automatizados da lógica descrita. Os itens abaixo são um roteiro de validação manual, não resultados de testes executados nesta documentação.</p>
+<ul>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Compilar com JDK 21 e Maven: <code>mvn clean package</code>.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Testar uma captura JSON com métrica <code>status = &quot;ok&quot;</code> e valor numérico.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Confirmar que <code>LimiteDao</code> retorna a configuração correta para o MAC.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Confirmar atenção, crítico e nenhuma ocorrência com limites conhecidos.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Confirmar prioridade de crítico no mesmo lote.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Confirmar que CPUs lógicas diferentes não são agrupadas entre si.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Confirmar que um lote concluído recebe <code>.ok</code> e é ignorado no próximo ciclo.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Confirmar criação do primeiro chamado, busca do existente e escalada para crítico.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Confirmar que uma leitura normal <strong>não fecha</strong> o chamado.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Simular falha de Jira e confirmar que o lote sem conclusão <strong>não recebe <code>.ok</code></strong>.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Verificar políticas AWS e permissões Jira no ambiente de implantação.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>Garantir que <code>.env</code>, tokens e qualquer pasta <code>.git/</code> de cópia local não sejam incluídos em pacotes públicos de distribuição.</li>
+</ul>
+<h2 id="11-glossario-e-caminhos-de-referencia"><a class="hash" href="#11-glossario-e-caminhos-de-referencia" aria-label="Link para esta seção">#</a>11. Glossário e caminhos de referência</h2>
+<div class="table-container"><table>
+<thead>
+<tr>
+  <th>Termo</th>
+  <th>Significado no módulo Java</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Captura</strong></td>
+  <td>Objeto JSON do S3 com dados da máquina e arrays de métricas/processos/contêineres</td>
+</tr>
+<tr>
+  <td><strong>Lote</strong></td>
+  <td>Unidade de processamento identificada por sua chave S3 e, dentro do JSON, pelo <code>lote_id</code></td>
+</tr>
+<tr>
+  <td><strong>Métrica</strong></td>
+  <td>Nome usado em <code>metrica</code> no JSON e comparado a <code>componentes.nome_coluna</code></td>
+</tr>
+<tr>
+  <td><strong>Recurso</strong></td>
+  <td>Identificador da parte monitorada: máquina, CPU lógica, disco, interface, processo ou contêiner</td>
+</tr>
+<tr>
+  <td><strong>Limite</strong></td>
+  <td>Configuração de atenção/crítico do perfil no MySQL, com até duas condições</td>
+</tr>
+<tr>
+  <td><strong>Ocorrência</strong></td>
+  <td>Resultado de comparação que atingiu atenção ou crítico; ainda não é um ticket</td>
+</tr>
+<tr>
+  <td><strong>Etiqueta estável</strong></td>
+  <td>Hash SHA-256 truncado que identifica o mesmo problema entre lotes</td>
+</tr>
+<tr>
+  <td><strong>Marcador <code>.ok</code></strong></td>
+  <td>Objeto no S3 que indica que o arquivo de captura terminou seu processamento</td>
+</tr>
+<tr>
+  <td><strong>JQL</strong></td>
+  <td>Linguagem de consulta do Jira usada para localizar issues não concluídas</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<p><strong>Como manter esta documentação:</strong> revise este guia sempre que mudar o contrato JSON, a estrutura do banco, os operadores, a estratégia de deduplicação ou os endpoints da integração Jira. A documentação foi construída a partir do código efetivamente presente em <code>java.zip</code> e não modifica nenhuma classe Java.</p>
+</article><div class="footer">CoreTrace · Documentação de referência do módulo Java. Nenhuma credencial ou código-fonte privado foi incorporado a esta página.</div></main>
+</div></div>
+<a class="backtop" href="#coretrace-documentacao-tecnica-da-api-java" aria-label="Voltar ao topo">↑ &nbsp;Topo</a>
+<script>
+(()=>{
+  const sidebar=document.getElementById('sidebar');
+  const menu=document.getElementById('menu');
+  menu.addEventListener('click',()=>{const shown=sidebar.classList.toggle('show');menu.setAttribute('aria-expanded',String(shown))});
+  document.querySelectorAll('#nav a').forEach(a=>a.addEventListener('click',()=>{sidebar.classList.remove('show');menu.setAttribute('aria-expanded','false')}));
+  const search=document.getElementById('navSearch');const empty=document.getElementById('emptySearch');
+  search.addEventListener('input',()=>{const q=search.value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();let count=0;
+    document.querySelectorAll('#nav a').forEach(a=>{const txt=a.textContent.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();const visible=!q||txt.includes(q);a.style.display=visible?'':'none';if(visible)count++});empty.style.display=count?'none':'block';
+  });
+  document.querySelectorAll('.copy').forEach(button=>button.addEventListener('click',async()=>{
+    const code=button.closest('.codeblock').querySelector('pre').innerText;
+    try{await navigator.clipboard.writeText(code);button.textContent='Copiado!';setTimeout(()=>button.textContent='Copiar',1300)}catch(e){button.textContent='Selecione o código';setTimeout(()=>button.textContent='Copiar',1600)}
+  }));
+  const progress=document.getElementById('readProgress');
+  const update=()=>{const d=document.documentElement;const denom=Math.max(d.scrollHeight-d.clientHeight,1);progress.style.width=Math.min(100,Math.max(0,100*d.scrollTop/denom))+'%'};
+  addEventListener('scroll',update,{passive:true});update();
+  const navLinks=[...document.querySelectorAll('#nav a')];
+  const observer=new IntersectionObserver(entries=>{
+    const visible=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top);
+    if(!visible.length)return;
+    navLinks.forEach(a=>a.classList.toggle('active',a.hash==='#'+visible[0].target.id));
+  },{rootMargin:'-12% 0px -76% 0px'});
+  document.querySelectorAll('h2[id],h3[id]').forEach(h=>observer.observe(h));
+})();
+</script>
+</body></html>
