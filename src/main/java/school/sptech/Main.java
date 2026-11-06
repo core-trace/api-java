@@ -10,22 +10,6 @@ import java.util.concurrent.TimeUnit;
  * configuradas para cada servidor no MySQL e cria ticket no Jira para alertas críticos.
  */
 public class Main {
-
-    /**
-     * Representa uma ocorrência identificada
-     * durante a análise das métricas.
-     */
-    public record Ocorrencia(
-            String mac,
-            String recurso,
-            String metrica,
-            String campoOrigem,
-            double valor,
-            String nivel,
-            String operador,
-            double limite
-    ) {}
-
     public static void main(String[] args) {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 

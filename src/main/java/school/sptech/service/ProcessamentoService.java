@@ -3,7 +3,7 @@ package school.sptech.service;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
-import school.sptech.Main.Ocorrencia;
+import school.sptech.model.Ocorrencia;
 import school.sptech.client.MySqlProvider;
 import school.sptech.client.S3Provider;
 import school.sptech.config.Env;

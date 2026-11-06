@@ -2,7 +2,7 @@ package school.sptech.service;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
-import school.sptech.Main.Ocorrencia;
+import school.sptech.model.Ocorrencia;
 import school.sptech.docker.LimiteDao;
 
 import java.io.IOException;

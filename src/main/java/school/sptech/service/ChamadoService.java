@@ -1,6 +1,6 @@
 package school.sptech.service;
 
-import school.sptech.Main.Ocorrencia;
+import school.sptech.model.Ocorrencia;
 import school.sptech.config.Env;
 import school.sptech.config.Jira;
 import java.io.IOException;
