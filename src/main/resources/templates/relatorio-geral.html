@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Relatório CoreTrace</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-size: 9px;
+                color: #777279;
+            }
+        }
+
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #211e22;
+            font-size: 12px;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+
+        .subtitulo {
+            color: #777279;
+            margin-top: 0;
+            margin-bottom: 18px;
+        }
+
+        h2 {
+            font-size: 15px;
+            margin-top: 22px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #e5e3e0;
+            padding-bottom: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .tabela-kpis td {
+            width: 33%;
+            padding: 8px;
+            border: 1px solid #e5e3e0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .tabela-kpis .valor {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .tabela-kpis .legenda {
+            color: #777279;
+            font-size: 10px;
+        }
+
+        .tabela-perfis th, .tabela-perfis td {
+            border: 1px solid #e5e3e0;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 11px;
+        }
+
+        .tabela-perfis th {
+            background-color: #f7f7f2;
+        }
+
+        .motivo {
+            margin-top: 2px;
+        }
+
+        .cobertura-texto {
+            color: #777279;
+            font-size: 11px;
+        }
+
+        ol.acoes {
+            padding-left: 18px;
+        }
+
+        ol.acoes li {
+            margin-bottom: 6px;
+        }
+
+        ol.acoes .destino {
+            color: #777279;
+            font-size: 10px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<h1>CoreTrace - Relatório geral</h1>
+<p class="subtitulo" th:text="${estado.titulo} + ' · ' + ${estado.data}">Estado às 20h30 · 27 nov 2026</p>
+
+<h2>Indicadores</h2>
+<table class="tabela-kpis">
+    <tr>
+        <td>
+            <div class="valor" th:text="${indicadores.criticos}">0</div>
+            <div>Críticos</div>
+            <div class="legenda" th:text="${indicadores.criticosLegenda}">—</div>
+        </td>
+        <td>
+            <div class="valor" th:text="${indicadores.atencao}">0</div>
+            <div>Em atenção</div>
+            <div class="legenda" th:text="${indicadores.atencaoLegenda}">—</div>
+        </td>
+        <td>
+            <div class="valor" th:text="${indicadores.semDadosRecentes}">0</div>
+            <div>Sem dados recentes</div>
+            <div class="legenda" th:text="${indicadores.semDadosLegenda}">—</div>
+        </td>
+    </tr>
+</table>
+
+<h2>Resumo da situação</h2>
+<strong th:text="${resumo.titulo}">Título do resumo</strong>
+<p class="motivo" th:text="${resumo.motivo}">Motivo</p>
+<p class="cobertura-texto" th:text="${resumo.cobertura}">Cobertura</p>
+
+<table class="tabela-perfis" th:if="${not #lists.isEmpty(resumo.comparacao)}">
+    <thead>
+    <tr>
+        <th>Perfil</th>
+        <th>Afetados</th>
+        <th>Duração</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="item : ${resumo.comparacao}">
+        <td th:text="${item.perfil}">Perfil</td>
+        <td th:text="${item.afetados}">0 de 0</td>
+        <td th:text="${item.duracao}">—</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Saúde por perfil</h2>
+<table class="tabela-perfis">
+    <thead>
+    <tr>
+        <th>Perfil</th>
+        <th>Afetados</th>
+        <th>Proporção</th>
+        <th>Situação</th>
+        <th>Duração</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="perfil : ${perfis}">
+        <td th:text="${perfil.nome}">Perfil</td>
+        <td th:text="${perfil.afetados}">0 de 0</td>
+        <td th:text="${perfil.proporcao}">0% do perfil</td>
+        <td th:text="${perfil.descricao}">Descrição</td>
+        <td>
+            <span th:text="${perfil.duracao}">—</span><br/>
+            <span class="legenda" th:text="${perfil.referencia}">—</span>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Ações recomendadas</h2>
+<ol class="acoes">
+    <li th:each="acao : ${acoes}">
+        <span th:text="${acao.titulo}">Título da ação</span>
+        <span class="destino" th:text="${acao.destino}">Destino</span>
+    </li>
+    <li th:if="${#lists.isEmpty(acoes)}">Nenhuma ação recomendada no momento.</li>
+</ol>
+
+</body>
+</html>
